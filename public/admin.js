@@ -35,8 +35,16 @@ for (const b of document.querySelectorAll('[data-cerrar]')) b.onclick = () => b.
 // ---------- Productos ----------
 async function cargarProductos() {
   productos = await api('GET', '/api/productos?todos=1');
-  $('#tabla-productos').innerHTML = productos.length
-    ? productos.map((p) => `<tr>
+  pintarProductos();
+  $('#lista-categorias').innerHTML = [...new Set(productos.map((p) => p.categoria))]
+    .map((c) => `<option value="${esc(c)}">`).join('');
+}
+
+function pintarProductos() {
+  const q = $('#buscar-producto').value.trim().toLowerCase();
+  const lista = productos.filter((p) => !q || `${p.nombre} ${p.categoria}`.toLowerCase().includes(q));
+  $('#tabla-productos').innerHTML = lista.length
+    ? lista.map((p) => `<tr>
         <td><b>${esc(p.nombre)}</b>${p.seVende ? '' : ' <span class="etiqueta gris">Insumo</span>'}</td>
         <td>${esc(p.categoria)}</td>
         <td class="num">${cop(p.precio)}</td>
@@ -46,10 +54,9 @@ async function cargarProductos() {
           <button class="btn mini" data-editar="${p.id}">Editar</button>
           <button class="btn mini peligro" data-borrar="${p.id}">Borrar</button>
         </td></tr>`).join('')
-    : '<tr><td colspan="6" class="vacio">Aún no hay productos. Crea el primero.</td></tr>';
-  $('#lista-categorias').innerHTML = [...new Set(productos.map((p) => p.categoria))]
-    .map((c) => `<option value="${esc(c)}">`).join('');
+    : `<tr><td colspan="6" class="vacio">${productos.length ? 'Ningún producto coincide con la búsqueda.' : 'Aún no hay productos. Crea el primero.'}</td></tr>`;
 }
+$('#buscar-producto').oninput = pintarProductos;
 
 function abrirProducto(p) {
   editandoId = p?.id ?? null;
@@ -69,7 +76,7 @@ $('#tabla-productos').onclick = async (e) => {
   if (!b) return;
   if (b.dataset.editar) return abrirProducto(productos.find((p) => p.id === Number(b.dataset.editar)));
   const p = productos.find((x) => x.id === Number(b.dataset.borrar));
-  if (!p || !confirm(`¿Borrar "${p.nombre}"? Esta acción no se puede deshacer.`)) return;
+  if (!p || !(await confirmar(`¿Borrar "${p.nombre}"? Esta acción no se puede deshacer.`, 'Borrar'))) return;
   try {
     await api('DELETE', `/api/productos/${p.id}`);
     aviso('Producto borrado');
@@ -161,6 +168,7 @@ $('#tabla-usuarios').onclick = async (e) => {
   const b = e.target.closest('button[data-usuario]');
   const u = b && usuarios.find((x) => x.id === Number(b.dataset.usuario));
   if (!u) return;
+  if (u.activo && !(await confirmar(`¿Desactivar a ${u.nombre}? No podrá ingresar hasta que lo actives de nuevo.`, 'Desactivar'))) return;
   try {
     await api('PUT', `/api/usuarios/${u.id}`, { activo: !u.activo });
     await cargarUsuarios();
@@ -185,13 +193,38 @@ async function cargarReporte() {
   $('#rep-total').textContent = cop(r.total);
   $('#rep-ventas').textContent = r.ventas;
   $('#rep-descuentos').textContent = cop(r.descuentos);
+  // Barra por día relativa al mejor día; por método, a su parte del total.
+  const mejorDia = Math.max(1, ...r.porDia.map((d) => d.total));
+  const medidor = (parte, todo) => `<div class="medidor"><i style="width:${Math.round((parte / todo) * 100)}%"></i></div>`;
   $('#rep-dias').innerHTML = r.porDia.length
-    ? r.porDia.map((d) => `<tr><td>${esc(diaLargo(d.dia))}</td><td class="num">${d.ventas}</td><td class="num"><b>${cop(d.total)}</b></td></tr>`).join('')
+    ? r.porDia.map((d) => `<tr><td>${esc(diaLargo(d.dia))}${medidor(d.total, mejorDia)}</td><td class="num">${d.ventas}</td><td class="num"><b>${cop(d.total)}</b></td></tr>`).join('')
     : '<tr><td colspan="3" class="vacio">No hubo ventas en este rango.</td></tr>';
   $('#rep-metodos').innerHTML = r.porMetodo.length
-    ? r.porMetodo.map((m) => `<tr><td>${METODOS[m.metodo]}</td><td class="num">${m.ventas}</td><td class="num"><b>${cop(m.total)}</b></td></tr>`).join('')
+    ? r.porMetodo.map((m) => `<tr><td>${METODOS[m.metodo]} <span class="tenue chico">· ${Math.round((m.total / Math.max(1, r.total)) * 100)} %</span>${medidor(m.total, Math.max(1, r.total))}</td><td class="num">${m.ventas}</td><td class="num"><b>${cop(m.total)}</b></td></tr>`).join('')
     : '<tr><td colspan="3" class="vacio">No hubo ventas en este rango.</td></tr>';
 }
+
+function rangoRapido(nombre) {
+  const hoy = hoyIso();
+  const rangos = {
+    hoy: [hoy, hoy],
+    ayer: [sumarDias(hoy, -1), sumarDias(hoy, -1)],
+    semana: [sumarDias(hoy, -6), hoy],
+    mes: [`${hoy.slice(0, 8)}01`, hoy],
+  };
+  [$('#desde').value, $('#hasta').value] = rangos[nombre];
+  marcarRango(nombre);
+}
+function marcarRango(nombre) {
+  for (const b of document.querySelectorAll('#rangos button')) b.setAttribute('aria-pressed', b.dataset.rango === nombre);
+}
+$('#rangos').onclick = (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  rangoRapido(b.dataset.rango);
+  cargarReporte().catch((err) => aviso(err.message, true));
+};
+$('#desde').onchange = $('#hasta').onchange = () => marcarRango(null);
 $('#form-reporte').onsubmit = (e) => {
   e.preventDefault();
   cargarReporte().catch((err) => aviso(err.message, true));
@@ -199,9 +232,7 @@ $('#form-reporte').onsubmit = (e) => {
 
 (async () => {
   yo = await iniciarSesionUi();
-  // Por defecto: del primer día del mes hasta hoy.
-  $('#hasta').value = hoyIso();
-  $('#desde').value = `${hoyIso().slice(0, 8)}01`;
+  rangoRapido('mes');
   const cargar = { productos: cargarProductos, inventario: cargarInventario, usuarios: cargarUsuarios, reportes: cargarReporte };
   iniciarPestanas((vista) => cargar[vista]().catch((err) => aviso(err.message, true)));
 })();

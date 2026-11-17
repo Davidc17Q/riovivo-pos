@@ -32,9 +32,12 @@ function pintarProductos() {
     ? lista.map((p) => {
         const agotado = p.controlaStock && p.stock <= 0;
         const nota = agotado ? 'Agotado' : p.controlaStock ? `Quedan ${p.stock}` : esc(p.categoria);
-        return `<button type="button" class="producto" data-id="${p.id}" ${agotado ? 'disabled' : ''}>
+        const poco = p.controlaStock && p.stock <= 5 ? 'poco' : 'tenue';
+        const cant = carrito.get(p.id);
+        return `<button type="button" class="producto ${cant ? 'elegido' : ''}" data-id="${p.id}" ${agotado ? 'disabled' : ''}>
+          ${cant ? `<span class="insignia" aria-label="${cant} en la venta">${cant}</span>` : ''}
           <b>${esc(p.nombre)}</b>
-          <span class="pie"><span class="tenue chico">${nota}</span><span class="precio">${cop(p.precio)}</span></span>
+          <span class="pie"><span class="${poco} chico">${nota}</span><span class="precio">${cop(p.precio)}</span></span>
         </button>`;
       }).join('')
     : '<p class="vacio">No hay productos que coincidan.</p>';
@@ -47,6 +50,7 @@ function cambiar(id, delta) {
   if (p.controlaStock && nueva > p.stock) return aviso(`Solo quedan ${p.stock} de ${p.nombre}`, true);
   if (nueva <= 0) carrito.delete(id);
   else carrito.set(id, Math.min(nueva, 9999));
+  pintarProductos();
   pintarCarrito();
 }
 
@@ -70,16 +74,22 @@ function pintarCarrito() {
             <button type="button" data-id="${id}" data-delta="-1" aria-label="Quitar uno de ${esc(p.nombre)}">−</button>
             <span>${cant}</span>
             <button type="button" data-id="${id}" data-delta="1" aria-label="Agregar uno de ${esc(p.nombre)}">+</button>
+            <span class="tenue chico">× ${cop(p.precio)}</span>
           </span>
-          <span class="num tenue chico">${cop(p.precio)} c/u</span>
+          <button type="button" class="texto-btn" data-id="${id}" data-delta="-9999" aria-label="Quitar ${esc(p.nombre)} de la venta">Quitar</button>
         </div>`;
       }).join('')
     : '<p class="vacio">Toca un producto para agregarlo.</p>';
   const t = calcular();
+  const unidades = [...carrito.values()].reduce((s, c) => s + c, 0);
   $('#subtotal').textContent = cop(t.subtotal);
   $('#valor-descuento').textContent = t.descuento ? `− ${cop(t.descuento)}` : cop(0);
   $('#total').textContent = cop(t.total);
   $('#cobrar').disabled = carrito.size === 0;
+  $('#cobrar').textContent = carrito.size ? `Cobrar ${cop(t.total)}` : 'Agrega productos para cobrar';
+  $('#vaciar').hidden = carrito.size === 0;
+  $('#barra-movil').hidden = carrito.size === 0;
+  $('#movil-resumen').textContent = `${unidades} ${unidades === 1 ? 'ítem' : 'ítems'} · ${cop(t.total)}`;
   for (const b of document.querySelectorAll('#metodos button')) b.setAttribute('aria-pressed', b.dataset.metodo === metodo);
 }
 
@@ -125,6 +135,10 @@ async function cargarHoy() {
   $('#titulo-hoy').textContent = `Ventas de hoy · ${diaLargo(d.fecha)}`;
   $('#hoy-total').textContent = cop(d.total);
   $('#hoy-cantidad').textContent = d.ventas.length;
+  // Total por método: es lo que se cuadra contra el cajón, el datáfono y el banco.
+  for (const m of Object.keys(METODOS)) {
+    $(`#hoy-${m}`).textContent = cop(d.ventas.filter((v) => v.metodoPago === m).reduce((s, v) => s + v.total, 0));
+  }
   $('#tabla-hoy').innerHTML = d.ventas.length
     ? d.ventas.map((v) => `<tr class="clic" data-id="${v.id}" tabindex="0">
         <td>${v.id}</td><td>${hora(v.creadaEn)}</td><td>${esc(v.usuario.nombre)}</td>
@@ -159,6 +173,13 @@ $('#metodos').onclick = (e) => {
   pintarCarrito();
 };
 $('#cobrar').onclick = cobrar;
+$('#vaciar').onclick = () => {
+  carrito.clear();
+  $('#descuento').value = '';
+  pintarProductos();
+  pintarCarrito();
+};
+$('#barra-movil').onclick = () => $('.carrito').scrollIntoView({ behavior: 'smooth' });
 $('#recargar').onclick = () => cargarHoy().catch((err) => aviso(err.message, true));
 function abrirFila(e) {
   const tr = e.target.closest('tr[data-id]');

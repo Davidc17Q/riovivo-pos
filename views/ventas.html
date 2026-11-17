@@ -8,7 +8,7 @@
 </head>
 <body>
   <header class="barra">
-    <span class="marca">Río Vivo · Ventas</span>
+    <span class="marca"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 9c3-3 6 3 9 0s6 3 9 0M3 15c3-3 6 3 9 0s6 3 9 0"/></svg> Río Vivo · Ventas</span>
     <nav class="pestanas" role="tablist">
       <button role="tab" data-vista="nueva">Nueva venta</button>
       <button role="tab" data-vista="hoy">Ventas de hoy</button>
@@ -29,7 +29,10 @@
       </div>
 
       <aside class="panel carrito" aria-label="Venta en curso">
-        <h2>Venta en curso</h2>
+        <div class="cabecera" style="margin-bottom:4px">
+          <h2>Venta en curso</h2>
+          <button type="button" class="texto-btn" id="vaciar" hidden>Vaciar</button>
+        </div>
         <div id="lineas"></div>
         <div class="fila" style="margin-top:14px">
           <label>Descuento
@@ -65,6 +68,9 @@
       <div class="kpis">
         <div class="kpi"><span>Total vendido</span><b id="hoy-total"></b></div>
         <div class="kpi"><span>Ventas</span><b id="hoy-cantidad"></b></div>
+        <div class="kpi"><span>Efectivo</span><b id="hoy-EFECTIVO"></b></div>
+        <div class="kpi"><span>Tarjeta</span><b id="hoy-TARJETA"></b></div>
+        <div class="kpi"><span>Transferencia</span><b id="hoy-TRANSFERENCIA"></b></div>
       </div>
       <div class="panel tabla-caja">
         <table>
@@ -75,11 +81,16 @@
     </section>
   </main>
 
+  <!-- En pantallas angostas la venta queda debajo del catálogo: esta barra la mantiene a la vista. -->
+  <button type="button" class="barra-movil" id="barra-movil" hidden>
+    <span id="movil-resumen"></span><b>Ver venta</b>
+  </button>
+
   <dialog id="dlg-ticket" aria-label="Ticket de venta">
     <div class="ticket" id="ticket"></div>
     <div class="botones">
       <button class="btn" id="imprimir">Imprimir</button>
-      <button class="btn primario" id="cerrar-ticket">Cerrar</button>
+      <button class="btn primario" id="cerrar-ticket">Listo</button>
     </div>
   </dialog>
 

@@ -56,6 +56,32 @@ function aviso(texto, mal = false) {
   relojAviso = setTimeout(() => (el.hidden = true), mal ? 6000 : 3000);
 }
 
+/** Confirmación con diálogo propio (legible en tablet). Resuelve true si se acepta. */
+function confirmar(texto, etiqueta = 'Confirmar') {
+  return new Promise((resolver) => {
+    const d = document.createElement('dialog');
+    d.innerHTML = `<p style="margin:0">${esc(texto)}</p>
+      <div class="botones"><button class="btn" value="no" autofocus>Cancelar</button><button class="btn rojo" value="si">${esc(etiqueta)}</button></div>`;
+    document.body.append(d);
+    d.onclick = (e) => {
+      const b = e.target.closest('button');
+      if (b) d.close(b.value);
+    };
+    d.onclose = () => {
+      d.remove();
+      resolver(d.returnValue === 'si');
+    };
+    d.showModal();
+  });
+}
+
+/** Suma días a una fecha "AAAA-MM-DD". */
+function sumarDias(dia, n) {
+  const d = new Date(`${dia}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
 /** Pestañas: botones [data-vista] muestran la sección #vista-<nombre>. */
 function iniciarPestanas(alAbrir) {
   const botones = [...document.querySelectorAll('.pestanas button')];

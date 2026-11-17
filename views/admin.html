@@ -8,7 +8,7 @@
 </head>
 <body>
   <header class="barra">
-    <span class="marca">Río Vivo · Administración</span>
+    <span class="marca"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 9c3-3 6 3 9 0s6 3 9 0M3 15c3-3 6 3 9 0s6 3 9 0"/></svg> Río Vivo · Administración</span>
     <nav class="pestanas" role="tablist">
       <button role="tab" data-vista="productos">Productos</button>
       <button role="tab" data-vista="inventario">Inventario</button>
@@ -28,6 +28,7 @@
         <h2>Productos y servicios</h2>
         <button class="btn primario" id="nuevo-producto">Nuevo producto</button>
       </div>
+      <input type="search" id="buscar-producto" placeholder="Buscar por nombre o categoría" aria-label="Buscar producto" style="margin:0 0 12px">
       <div class="panel tabla-caja">
         <table>
           <thead><tr><th>Nombre</th><th>Categoría</th><th class="num">Precio</th><th>Inventario</th><th>Estado</th><th></th></tr></thead>
@@ -73,7 +74,13 @@
 
     <section id="vista-reportes" hidden>
       <h2>Reporte de ventas</h2>
-      <form class="fila panel" id="form-reporte" style="margin-top:14px">
+      <div class="rangos" id="rangos" role="group" aria-label="Rangos rápidos">
+        <button type="button" data-rango="hoy">Hoy</button>
+        <button type="button" data-rango="ayer">Ayer</button>
+        <button type="button" data-rango="semana">Últimos 7 días</button>
+        <button type="button" data-rango="mes">Este mes</button>
+      </div>
+      <form class="fila panel" id="form-reporte" style="margin-top:12px">
         <label>Desde <input type="date" id="desde" required></label>
         <label>Hasta <input type="date" id="hasta" required></label>
         <button class="btn primario fijo">Consultar</button>
