@@ -9,6 +9,7 @@ import fastifyStatic from '@fastify/static';
 import { rutasAuth, usuarioDeSesion } from './auth';
 import { rutasVentas } from './routes/ventas';
 import { rutasAdmin } from './routes/admin';
+import { rutasCaja } from './routes/caja';
 import { ErrorHttp } from './util';
 
 const RAIZ = path.join(__dirname, '..');
@@ -45,6 +46,7 @@ app.setErrorHandler((err: Error & { statusCode?: number }, _req, reply) => {
 
 app.register(rutasAuth);
 app.register(rutasVentas);
+app.register(rutasCaja);
 app.register(rutasAdmin);
 
 // Páginas: el servidor decide qué área puede abrir cada rol.

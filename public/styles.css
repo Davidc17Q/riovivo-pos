@@ -203,3 +203,12 @@ dialog[open] { animation: entrar .16s ease-out; }
   #dlg-ticket .botones { display: none; }
 }
 .linea .cant .tenue { min-width: 0; font-weight: 400; }
+
+/* Caja y anulaciones */
+.falta { color: var(--rojo); }
+tr.anulada td { color: var(--tenue); }
+tr.anulada .tachado { text-decoration: line-through; }
+.aviso-caja { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.angosto { max-width: 540px; }
+.apilado { display: grid; gap: 12px; }
+textarea { display: block; width: 100%; min-height: 84px; margin-top: 4px; padding: 10px 12px; border: 1px solid var(--borde); border-radius: var(--radio); font: inherit; color: var(--tinta); resize: vertical; }

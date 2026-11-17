@@ -3,6 +3,9 @@ let productos = [];
 const carrito = new Map(); // productoId → cantidad
 let categoria = 'Todas';
 let metodo = 'EFECTIVO';
+let yo = null;
+let caja = null; // caja abierta de este usuario (null = no puede vender)
+let ventaEnTicket = null;
 
 const porId = (id) => productos.find((p) => p.id === id);
 
@@ -85,8 +88,9 @@ function pintarCarrito() {
   $('#subtotal').textContent = cop(t.subtotal);
   $('#valor-descuento').textContent = t.descuento ? `− ${cop(t.descuento)}` : cop(0);
   $('#total').textContent = cop(t.total);
-  $('#cobrar').disabled = carrito.size === 0;
-  $('#cobrar').textContent = carrito.size ? `Cobrar ${cop(t.total)}` : 'Agrega productos para cobrar';
+  $('#sin-caja').hidden = Boolean(caja);
+  $('#cobrar').disabled = carrito.size === 0 || !caja;
+  $('#cobrar').textContent = !caja ? 'Abre la caja para cobrar' : carrito.size ? `Cobrar ${cop(t.total)}` : 'Agrega productos para cobrar';
   $('#vaciar').hidden = carrito.size === 0;
   $('#barra-movil').hidden = carrito.size === 0;
   $('#movil-resumen').textContent = `${unidades} ${unidades === 1 ? 'ítem' : 'ítems'} · ${cop(t.total)}`;
@@ -108,11 +112,97 @@ async function cobrar() {
   } catch (err) {
     aviso(err.message, true);
   }
-  await cargarProductos().catch(() => {});
+  // Se refresca también la caja: pudo cerrarla un administrador mientras tanto.
+  await Promise.all([cargarProductos(), cargarCaja()]).catch(() => {});
 }
 
+// ---------- Caja ----------
+async function cargarCaja() {
+  caja = (await api('GET', '/api/caja/actual')).caja;
+  pintarCarrito();
+}
+
+let cajas = [];
+async function cargarVistaCaja() {
+  [, cajas] = await Promise.all([cargarCaja(), api('GET', '/api/cajas')]);
+  $('#caja-cerrada').hidden = Boolean(caja);
+  $('#caja-abierta').hidden = !caja;
+  if (caja) {
+    const q = caja.cuadre;
+    $('#titulo-caja').textContent = `Caja N.º ${caja.id} · abierta ${fechaHora(caja.abiertaEn)}`;
+    $('#caja-base').textContent = cop(q.base);
+    $('#caja-efectivo').textContent = cop(q.efectivo);
+    $('#caja-esperado').textContent = cop(q.efectivoEsperado);
+    $('#caja-tarjeta').textContent = cop(q.tarjeta);
+    $('#caja-transferencia').textContent = cop(q.transferencia);
+    pintarDiferencia();
+  }
+  $('#titulo-cajas').textContent = yo.rol === 'ADMIN' ? 'Cajas recientes (todas)' : 'Mis cajas';
+  $('#tabla-cajas').innerHTML = filasCajas(cajas);
+}
+
+function pintarDiferencia() {
+  const el = $('#diferencia-viva');
+  const valor = $('#contado').value;
+  el.className = 'tenue';
+  if (valor === '' || !caja) return (el.textContent = 'Escribe lo que contaste para ver la diferencia.');
+  const dif = Number(valor) - caja.cuadre.efectivoEsperado;
+  el.textContent = `Esperado ${cop(caja.cuadre.efectivoEsperado)} · ${textoDiferencia(dif)}`;
+  if (dif < 0) el.className = 'falta';
+}
+
+function mostrarCuadre(c) {
+  ventaEnTicket = null;
+  $('#anular').hidden = true;
+  $('#ticket').innerHTML = htmlCuadre(c);
+  $('#dlg-ticket').showModal();
+}
+
+$('#form-abrir').onsubmit = async (e) => {
+  e.preventDefault();
+  const baseInicial = Number($('#base-inicial').value);
+  if (!Number.isInteger(baseInicial) || baseInicial < 0) return aviso('La base debe ser un número entero, sin decimales.', true);
+  try {
+    await api('POST', '/api/caja/abrir', { baseInicial });
+    $('#base-inicial').value = '';
+    aviso('Caja abierta');
+  } catch (err) {
+    aviso(err.message, true);
+  }
+  await cargarVistaCaja();
+};
+$('#contado').oninput = pintarDiferencia;
+$('#form-cerrar').onsubmit = async (e) => {
+  e.preventDefault();
+  const efectivoContado = Number($('#contado').value);
+  if (!Number.isInteger(efectivoContado) || efectivoContado < 0) return aviso('El efectivo contado debe ser un número entero.', true);
+  if (!(await confirmar(`¿Cerrar la caja con ${cop(efectivoContado)} contados? Después no podrás registrar ventas hasta abrir otra.`, 'Cerrar caja'))) return;
+  try {
+    const cerrada = await api('POST', `/api/caja/${caja.id}/cerrar`, { efectivoContado, nota: $('#nota-cierre').value.trim() });
+    $('#form-cerrar').reset();
+    mostrarCuadre(cerrada);
+  } catch (err) {
+    aviso(err.message, true);
+  }
+  await cargarVistaCaja();
+};
+$('#recargar-caja').onclick = () => cargarVistaCaja().catch((err) => aviso(err.message, true));
+function abrirCaja(e) {
+  const tr = e.target.closest('tr[data-caja]');
+  const c = tr && cajas.find((x) => x.id === Number(tr.dataset.caja));
+  if (c) mostrarCuadre(c);
+}
+$('#tabla-cajas').onclick = abrirCaja;
+$('#tabla-cajas').onkeydown = (e) => e.key === 'Enter' && abrirCaja(e);
+$('#ir-caja').onclick = () => $('[data-vista=caja]').click();
+
 function mostrarTicket(v) {
+  ventaEnTicket = v;
+  const anulada = v.estado === 'ANULADA';
+  // Regla: solo un administrador anula.
+  $('#anular').hidden = anulada || yo.rol !== 'ADMIN';
   $('#ticket').innerHTML = `
+    ${anulada ? `<p class="error"><b>VENTA ANULADA</b> · ${esc(fechaHora(v.anuladaEn))} · ${esc(v.anuladaPor?.nombre)}<br>Motivo: ${esc(v.motivoAnulacion)}</p>` : ''}
     <h3>Río Vivo Spa</h3>
     <p class="centro tenue chico">Santa Fe de Antioquia<br>Venta N.º ${v.id} · ${esc(fechaHora(v.creadaEn))}<br>Atendió: ${esc(v.usuario.nombre)}</p>
     <table>
@@ -130,21 +220,24 @@ function mostrarTicket(v) {
 
 let ventasHoy = [];
 async function cargarHoy() {
-  const d = await api('GET', '/api/ventas');
+  if (!$('#fecha-ventas').value) $('#fecha-ventas').value = hoyIso();
+  const d = await api('GET', `/api/ventas?fecha=${$('#fecha-ventas').value}`);
   ventasHoy = d.ventas;
-  $('#titulo-hoy').textContent = `Ventas de hoy · ${diaLargo(d.fecha)}`;
+  // Las anuladas se muestran, pero no cuentan en ningún total.
+  const activas = d.ventas.filter((v) => v.estado === 'ACTIVA');
+  $('#titulo-hoy').textContent = `Ventas del día · ${diaLargo(d.fecha)}`;
   $('#hoy-total').textContent = cop(d.total);
-  $('#hoy-cantidad').textContent = d.ventas.length;
+  $('#hoy-cantidad').textContent = activas.length;
   // Total por método: es lo que se cuadra contra el cajón, el datáfono y el banco.
   for (const m of Object.keys(METODOS)) {
-    $(`#hoy-${m}`).textContent = cop(d.ventas.filter((v) => v.metodoPago === m).reduce((s, v) => s + v.total, 0));
+    $(`#hoy-${m}`).textContent = cop(activas.filter((v) => v.metodoPago === m).reduce((s, v) => s + v.total, 0));
   }
   $('#tabla-hoy').innerHTML = d.ventas.length
-    ? d.ventas.map((v) => `<tr class="clic" data-id="${v.id}" tabindex="0">
+    ? d.ventas.map((v) => `<tr class="clic ${v.estado === 'ANULADA' ? 'anulada' : ''}" data-id="${v.id}" tabindex="0">
         <td>${v.id}</td><td>${hora(v.creadaEn)}</td><td>${esc(v.usuario.nombre)}</td>
         <td>${esc(v.items.map((i) => `${i.cantidad} × ${i.nombre}`).join(', '))}</td>
-        <td>${METODOS[v.metodoPago]}</td><td class="num"><b>${cop(v.total)}</b></td></tr>`).join('')
-    : '<tr><td colspan="6" class="vacio">Aún no hay ventas hoy.</td></tr>';
+        <td>${v.estado === 'ANULADA' ? '<span class="etiqueta rojo">Anulada</span>' : METODOS[v.metodoPago]}</td><td class="num"><b class="tachado">${cop(v.total)}</b></td></tr>`).join('')
+    : '<tr><td colspan="6" class="vacio">No hay ventas este día.</td></tr>';
 }
 
 // Eventos
@@ -188,13 +281,39 @@ function abrirFila(e) {
 }
 $('#tabla-hoy').onclick = abrirFila;
 $('#tabla-hoy').onkeydown = (e) => e.key === 'Enter' && abrirFila(e);
+$('#fecha-ventas').onchange = () => cargarHoy().catch((err) => aviso(err.message, true));
+$('#anular').onclick = () => {
+  $('#titulo-anular').textContent = `Anular venta N.º ${ventaEnTicket.id} · ${cop(ventaEnTicket.total)}`;
+  $('#motivo-anular').value = '';
+  $('#error-anular').hidden = true;
+  $('#dlg-anular').showModal();
+};
+$('#cancelar-anular').onclick = () => $('#dlg-anular').close();
+$('#form-anular').onsubmit = async (e) => {
+  e.preventDefault();
+  const boton = $('#form-anular .rojo');
+  boton.disabled = true;
+  try {
+    const anulada = await api('POST', `/api/ventas/${ventaEnTicket.id}/anular`, { motivo: $('#motivo-anular').value });
+    $('#dlg-anular').close();
+    mostrarTicket(anulada);
+    aviso('Venta anulada');
+    await Promise.all([cargarHoy(), cargarProductos(), cargarCaja()]);
+  } catch (err) {
+    $('#error-anular').textContent = err.message;
+    $('#error-anular').hidden = false;
+  }
+  boton.disabled = false;
+};
 $('#imprimir').onclick = () => window.print();
 $('#cerrar-ticket').onclick = () => $('#dlg-ticket').close();
 
 (async () => {
-  const yo = await iniciarSesionUi();
+  yo = await iniciarSesionUi();
+  await cargarCaja();
   $('#ir-admin').hidden = yo.rol !== 'ADMIN';
   iniciarPestanas((vista) => {
-    (vista === 'hoy' ? cargarHoy() : cargarProductos()).catch((err) => aviso(err.message, true));
+    const cargar = { nueva: () => Promise.all([cargarProductos(), cargarCaja()]), hoy: cargarHoy, caja: cargarVistaCaja };
+    cargar[vista]().catch((err) => aviso(err.message, true));
   });
 })();

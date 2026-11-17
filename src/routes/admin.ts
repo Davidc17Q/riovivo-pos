@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../db';
 import { soloAdmin } from '../auth';
+import { conDetalle } from './ventas';
 import {
   ErrorHttp, UN_DIA_MS, ZONA, booleano, entero, fecha, idDeUrl, inicioDelDia, objeto, opcion, texto,
 } from '../util';
@@ -129,6 +130,48 @@ export async function rutasAdmin(app: FastifyInstance) {
     return reply.code(201).send(mov);
   });
 
+  // ---------- Anulación de ventas ----------
+  // Regla: solo ADMIN anula. La venta no se borra: queda ANULADA con quién, cuándo y por qué,
+  // y el inventario que descontó se repone con un movimiento inverso. Todo o nada.
+  app.post('/api/ventas/:id/anular', async (req) => {
+    const id = idDeUrl(req.params);
+    const motivo = texto(objeto(req.body).motivo, 'Motivo', 5, 200);
+    const usuarioId = req.usuario!.id;
+
+    await prisma.$transaction(async (tx) => {
+      // Bloquea la venta: dos anulaciones simultáneas no reponen el stock dos veces.
+      const filas = await tx.$queryRaw<{ estado: string; cajaId: number | null }[]>`
+        SELECT estado::text AS estado, "cajaId" FROM "Venta" WHERE id = ${id} FOR UPDATE`;
+      const venta = filas[0];
+      if (!venta) throw new ErrorHttp(404, 'Venta no encontrada');
+      if (venta.estado === 'ANULADA') throw new ErrorHttp(409, 'Esta venta ya estaba anulada');
+      // Si su caja se está cerrando en este instante, espera: la anulación cae antes o después del cierre, nunca en medio.
+      if (venta.cajaId) await tx.$queryRaw`SELECT id FROM "SesionCaja" WHERE id = ${venta.cajaId} FOR SHARE`;
+
+      // Se repone exactamente lo que esta venta descontó (mismo orden de ids que al vender).
+      const descontados = await tx.movimientoInventario.findMany({
+        where: { ventaId: id, tipo: 'VENTA' },
+        orderBy: { productoId: 'asc' },
+      });
+      for (const m of descontados) {
+        const devuelto = -m.cantidad;
+        const p = await tx.producto.update({
+          where: { id: m.productoId },
+          data: { stock: { increment: devuelto } },
+          select: { stock: true },
+        });
+        await tx.movimientoInventario.create({
+          data: { productoId: m.productoId, tipo: 'ANULACION', cantidad: devuelto, stockResultante: p.stock, nota: motivo, usuarioId, ventaId: id },
+        });
+      }
+      await tx.venta.update({
+        where: { id },
+        data: { estado: 'ANULADA', anuladaEn: new Date(), anuladaPorId: usuarioId, motivoAnulacion: motivo },
+      });
+    });
+    return prisma.venta.findUnique({ where: { id }, include: conDetalle });
+  });
+
   // ---------- Reportes ----------
   app.get('/api/reportes', async (req) => {
     const q = req.query as { desde?: string; hasta?: string };
@@ -142,12 +185,36 @@ export async function rutasAdmin(app: FastifyInstance) {
     // El día se agrupa en hora de Colombia, no en UTC.
     const dias = await prisma.$queryRaw<{ dia: string; ventas: bigint; total: bigint }[]>`
       SELECT to_char("creadaEn" AT TIME ZONE ${ZONA}, 'YYYY-MM-DD') AS dia, COUNT(*) AS ventas, SUM(total) AS total
-      FROM "Venta" WHERE "creadaEn" >= ${inicio} AND "creadaEn" < ${fin}
+      FROM "Venta" WHERE estado = 'ACTIVA' AND "creadaEn" >= ${inicio} AND "creadaEn" < ${fin}
       GROUP BY 1 ORDER BY 1`;
     const metodos = await prisma.venta.groupBy({
       by: ['metodoPago'],
-      where: { creadaEn: { gte: inicio, lt: fin } },
+      where: { estado: 'ACTIVA', creadaEn: { gte: inicio, lt: fin } },
       _sum: { total: true, descuento: true },
+      _count: true,
+    });
+    // Por producto: valor de las líneas, antes del descuento de la venta.
+    const productos = await prisma.$queryRaw<{ id: number; nombre: string; categoria: string; cantidad: bigint; total: bigint }[]>`
+      SELECT p.id, p.nombre, p.categoria, SUM(i.cantidad) AS cantidad, SUM(i."totalLinea") AS total
+      FROM "VentaItem" i JOIN "Venta" v ON v.id = i."ventaId" JOIN "Producto" p ON p.id = i."productoId"
+      WHERE v.estado = 'ACTIVA' AND v."creadaEn" >= ${inicio} AND v."creadaEn" < ${fin}
+      GROUP BY p.id ORDER BY total DESC, p.nombre`;
+    const porProducto = productos.map((p) => ({ ...p, cantidad: Number(p.cantidad), total: Number(p.total) }));
+    const categorias = new Map<string, { categoria: string; cantidad: number; total: number }>();
+    for (const p of porProducto) {
+      const c = categorias.get(p.categoria) ?? { categoria: p.categoria, cantidad: 0, total: 0 };
+      c.cantidad += p.cantidad;
+      c.total += p.total;
+      categorias.set(p.categoria, c);
+    }
+    const vendedores = await prisma.$queryRaw<{ id: number; nombre: string; ventas: bigint; total: bigint }[]>`
+      SELECT u.id, u.nombre, COUNT(*) AS ventas, SUM(v.total) AS total
+      FROM "Venta" v JOIN "Usuario" u ON u.id = v."usuarioId"
+      WHERE v.estado = 'ACTIVA' AND v."creadaEn" >= ${inicio} AND v."creadaEn" < ${fin}
+      GROUP BY u.id ORDER BY total DESC, u.nombre`;
+    const anuladas = await prisma.venta.aggregate({
+      where: { estado: 'ANULADA', creadaEn: { gte: inicio, lt: fin } },
+      _sum: { total: true },
       _count: true,
     });
 
@@ -160,6 +227,10 @@ export async function rutasAdmin(app: FastifyInstance) {
       descuentos: metodos.reduce((s, m) => s + (m._sum.descuento ?? 0), 0),
       porDia,
       porMetodo: metodos.map((m) => ({ metodo: m.metodoPago, ventas: m._count, total: m._sum.total ?? 0 })),
+      porProducto,
+      porCategoria: [...categorias.values()].sort((a, c) => c.total - a.total),
+      porVendedor: vendedores.map((v) => ({ ...v, ventas: Number(v.ventas), total: Number(v.total) })),
+      anuladas: { ventas: anuladas._count, total: anuladas._sum.total ?? 0 },
     };
   });
 }

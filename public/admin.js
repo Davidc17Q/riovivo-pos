@@ -5,7 +5,7 @@ let usuarios = [];
 let editandoId = null; // producto en edición (null = nuevo)
 let movimientoDe = null; // producto del movimiento de inventario
 
-const TIPOS = { ENTRADA: 'Entrada', SALIDA: 'Salida', AJUSTE: 'Ajuste', VENTA: 'Venta' };
+const TIPOS = { ENTRADA: 'Entrada', SALIDA: 'Salida', AJUSTE: 'Ajuste', VENTA: 'Venta', ANULACION: 'Anulación' };
 const ROLES = { ADMIN: 'Administrador', VENDEDOR: 'Vendedor' };
 
 /** Envía un formulario de diálogo: muestra el error dentro o cierra al terminar. */
@@ -150,6 +150,38 @@ alEnviar($('#dlg-movimiento'), async () => {
   await cargarInventario();
 });
 
+// ---------- Cajas ----------
+let cajas = [];
+let cajaACerrar = null;
+async function cargarCajas() {
+  cajas = await api('GET', '/api/cajas');
+  $('#tabla-cajas').innerHTML = filasCajas(cajas, true);
+}
+$('#tabla-cajas').onclick = (e) => {
+  const cerrar = e.target.closest('[data-cerrar-caja]');
+  const fila = e.target.closest('tr[data-caja]');
+  const c = fila && cajas.find((x) => x.id === Number(fila.dataset.caja));
+  if (!c) return;
+  if (!cerrar) {
+    $('#ticket').innerHTML = htmlCuadre(c);
+    return $('#dlg-ticket').showModal();
+  }
+  cajaACerrar = c;
+  $('#titulo-cierre').textContent = `Cerrar caja N.º ${c.id} · ${c.usuario.nombre}`;
+  $('#esperado-cierre').textContent = `Efectivo esperado: ${cop(c.cuadre.efectivoEsperado)} (base ${cop(c.cuadre.base)} + ventas en efectivo ${cop(c.cuadre.efectivo)}).`;
+  $('#form-cierre').reset();
+  abrir($('#dlg-cierre'));
+};
+$('#imprimir').onclick = () => window.print();
+alEnviar($('#dlg-cierre'), async () => {
+  const efectivoContado = Number($('#c-contado').value);
+  if (!Number.isInteger(efectivoContado) || efectivoContado < 0) throw new Error('El efectivo contado debe ser un número entero.');
+  const cerrada = await api('POST', `/api/caja/${cajaACerrar.id}/cerrar`, { efectivoContado, nota: $('#c-nota').value.trim() });
+  await cargarCajas();
+  $('#ticket').innerHTML = htmlCuadre(cerrada);
+  $('#dlg-ticket').showModal();
+});
+
 // ---------- Usuarios ----------
 async function cargarUsuarios() {
   usuarios = await api('GET', '/api/usuarios');
@@ -193,6 +225,7 @@ async function cargarReporte() {
   $('#rep-total').textContent = cop(r.total);
   $('#rep-ventas').textContent = r.ventas;
   $('#rep-descuentos').textContent = cop(r.descuentos);
+  $('#rep-anuladas').textContent = `${r.anuladas.ventas} · ${cop(r.anuladas.total)}`;
   // Barra por día relativa al mejor día; por método, a su parte del total.
   const mejorDia = Math.max(1, ...r.porDia.map((d) => d.total));
   const medidor = (parte, todo) => `<div class="medidor"><i style="width:${Math.round((parte / todo) * 100)}%"></i></div>`;
@@ -201,6 +234,17 @@ async function cargarReporte() {
     : '<tr><td colspan="3" class="vacio">No hubo ventas en este rango.</td></tr>';
   $('#rep-metodos').innerHTML = r.porMetodo.length
     ? r.porMetodo.map((m) => `<tr><td>${METODOS[m.metodo]} <span class="tenue chico">· ${Math.round((m.total / Math.max(1, r.total)) * 100)} %</span>${medidor(m.total, Math.max(1, r.total))}</td><td class="num">${m.ventas}</td><td class="num"><b>${cop(m.total)}</b></td></tr>`).join('')
+    : '<tr><td colspan="3" class="vacio">No hubo ventas en este rango.</td></tr>';
+  $('#rep-productos').innerHTML = ranking(r.porProducto, (p) => `${esc(p.nombre)} <span class="tenue chico">· ${esc(p.categoria)}</span>`, (p) => p.cantidad);
+  $('#rep-categorias').innerHTML = ranking(r.porCategoria, (c) => esc(c.categoria), (c) => c.cantidad);
+  $('#rep-vendedores').innerHTML = ranking(r.porVendedor, (v) => esc(v.nombre), (v) => v.ventas);
+}
+
+/** Tabla ordenada de mayor a menor, con barra relativa al primero. */
+function ranking(filas, nombre, cantidad) {
+  const tope = Math.max(1, ...filas.map((f) => f.total));
+  return filas.length
+    ? filas.map((f) => `<tr><td>${nombre(f)}<div class="medidor"><i style="width:${Math.round((f.total / tope) * 100)}%"></i></div></td><td class="num">${cantidad(f)}</td><td class="num"><b>${cop(f.total)}</b></td></tr>`).join('')
     : '<tr><td colspan="3" class="vacio">No hubo ventas en este rango.</td></tr>';
 }
 
@@ -233,6 +277,6 @@ $('#form-reporte').onsubmit = (e) => {
 (async () => {
   yo = await iniciarSesionUi();
   rangoRapido('mes');
-  const cargar = { productos: cargarProductos, inventario: cargarInventario, usuarios: cargarUsuarios, reportes: cargarReporte };
+  const cargar = { productos: cargarProductos, inventario: cargarInventario, cajas: cargarCajas, usuarios: cargarUsuarios, reportes: cargarReporte };
   iniciarPestanas((vista) => cargar[vista]().catch((err) => aviso(err.message, true)));
 })();

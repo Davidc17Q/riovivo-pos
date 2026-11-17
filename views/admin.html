@@ -12,6 +12,7 @@
     <nav class="pestanas" role="tablist">
       <button role="tab" data-vista="productos">Productos</button>
       <button role="tab" data-vista="inventario">Inventario</button>
+      <button role="tab" data-vista="cajas">Cajas</button>
       <button role="tab" data-vista="usuarios">Usuarios</button>
       <button role="tab" data-vista="reportes">Reportes</button>
     </nav>
@@ -59,6 +60,19 @@
       </div>
     </section>
 
+    <section id="vista-cajas" hidden>
+      <div class="cabecera">
+        <h2>Cajas</h2>
+        <span class="tenue chico">Toca una caja para ver su cuadre. Las ventas se anulan desde Ventas → Ventas del día.</span>
+      </div>
+      <div class="panel tabla-caja">
+        <table>
+          <thead><tr><th>N.º</th><th>Cajero</th><th>Apertura</th><th>Cierre</th><th class="num">Esperado</th><th class="num">Contado</th><th class="num">Diferencia</th></tr></thead>
+          <tbody id="tabla-cajas"></tbody>
+        </table>
+      </div>
+    </section>
+
     <section id="vista-usuarios" hidden>
       <div class="cabecera">
         <h2>Usuarios</h2>
@@ -89,6 +103,7 @@
         <div class="kpi"><span>Total vendido</span><b id="rep-total"></b></div>
         <div class="kpi"><span>Ventas</span><b id="rep-ventas"></b></div>
         <div class="kpi"><span>Descuentos otorgados</span><b id="rep-descuentos"></b></div>
+        <div class="kpi"><span>Anuladas (no cuentan)</span><b id="rep-anuladas"></b></div>
       </div>
       <div class="dos">
         <div class="panel tabla-caja">
@@ -104,6 +119,29 @@
             <thead><tr><th>Método</th><th class="num">Ventas</th><th class="num">Total</th></tr></thead>
             <tbody id="rep-metodos"></tbody>
           </table>
+        </div>
+        <div class="panel tabla-caja">
+          <h3 style="font-size:1rem;margin-bottom:8px">Por producto <span class="tenue chico">· antes de descuentos</span></h3>
+          <table>
+            <thead><tr><th>Producto</th><th class="num">Cantidad</th><th class="num">Total</th></tr></thead>
+            <tbody id="rep-productos"></tbody>
+          </table>
+        </div>
+        <div>
+          <div class="panel tabla-caja">
+            <h3 style="font-size:1rem;margin-bottom:8px">Por categoría <span class="tenue chico">· antes de descuentos</span></h3>
+            <table>
+              <thead><tr><th>Categoría</th><th class="num">Cantidad</th><th class="num">Total</th></tr></thead>
+              <tbody id="rep-categorias"></tbody>
+            </table>
+          </div>
+          <div class="panel tabla-caja" style="margin-top:20px">
+            <h3 style="font-size:1rem;margin-bottom:8px">Por vendedor</h3>
+            <table>
+              <thead><tr><th>Vendedor</th><th class="num">Ventas</th><th class="num">Total</th></tr></thead>
+              <tbody id="rep-vendedores"></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </section>
@@ -143,6 +181,28 @@
       <div class="botones">
         <button type="button" class="btn" data-cerrar>Cancelar</button>
         <button class="btn primario">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="dlg-ticket" aria-label="Cuadre de caja">
+    <div class="ticket" id="ticket"></div>
+    <div class="botones">
+      <button class="btn" id="imprimir">Imprimir</button>
+      <button type="button" class="btn primario" data-cerrar>Cerrar</button>
+    </div>
+  </dialog>
+
+  <dialog id="dlg-cierre">
+    <form id="form-cierre">
+      <h2 id="titulo-cierre">Cerrar caja</h2>
+      <p class="tenue" style="margin:0" id="esperado-cierre"></p>
+      <label>Efectivo contado en el cajón (pesos) <input type="number" id="c-contado" min="0" step="1" inputmode="numeric" required></label>
+      <label>Nota (opcional) <input type="text" id="c-nota" maxlength="200"></label>
+      <p class="error" id="error-cierre" role="alert" hidden></p>
+      <div class="botones">
+        <button type="button" class="btn" data-cerrar>Cancelar</button>
+        <button class="btn primario">Cerrar caja</button>
       </div>
     </form>
   </dialog>

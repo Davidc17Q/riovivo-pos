@@ -6,7 +6,11 @@ import { ErrorHttp, UN_DIA_MS, entero, fecha, hoy, idDeUrl, inicioDelDia, objeto
 const METODOS = ['EFECTIVO', 'TARJETA', 'TRANSFERENCIA'] as const;
 const TOTAL_MAXIMO = 2_000_000_000; // cabe en un entero de Postgres
 
-const conDetalle = { items: { orderBy: { id: 'asc' } }, usuario: { select: { nombre: true } } } as const;
+export const conDetalle = {
+  items: { orderBy: { id: 'asc' } },
+  usuario: { select: { nombre: true } },
+  anuladaPor: { select: { nombre: true } },
+} as const;
 
 export async function rutasVentas(app: FastifyInstance) {
   // Caja ve solo lo vendible y activo; el admin puede pedir todo el catálogo.
@@ -39,6 +43,13 @@ export async function rutasVentas(app: FastifyInstance) {
 
     // Venta, líneas y descuento de inventario: todo o nada.
     const venta = await prisma.$transaction(async (tx) => {
+      // Sin caja abierta no se vende. El bloqueo compartido deja vender a la vez,
+      // pero hace esperar al cierre: ninguna venta entra a una caja ya cuadrada.
+      const cajas = await tx.$queryRaw<{ id: number }[]>`
+        SELECT id FROM "SesionCaja" WHERE "usuarioId" = ${usuarioId} AND estado = 'ABIERTA' FOR SHARE`;
+      const cajaId = cajas[0]?.id;
+      if (!cajaId) throw new ErrorHttp(409, 'No hay caja abierta. Abre la caja antes de registrar ventas.');
+
       const productos = await tx.producto.findMany({ where: { id: { in: ids } } });
       const porId = new Map(productos.map((p) => [p.id, p]));
       let subtotal = 0;
@@ -55,7 +66,7 @@ export async function rutasVentas(app: FastifyInstance) {
       if (descuento > subtotal) throw new ErrorHttp(400, 'El descuento no puede ser mayor que el subtotal');
 
       const creada = await tx.venta.create({
-        data: { usuarioId, subtotal, descuento, total: subtotal - descuento, metodoPago, items: { create: lineas } },
+        data: { usuarioId, cajaId, subtotal, descuento, total: subtotal - descuento, metodoPago, items: { create: lineas } },
         include: conDetalle,
       });
 
@@ -88,7 +99,9 @@ export async function rutasVentas(app: FastifyInstance) {
       orderBy: { id: 'desc' },
       include: conDetalle,
     });
-    return { fecha: dia, total: ventas.reduce((s, v) => s + v.total, 0), ventas };
+    // Las anuladas se listan, pero no suman.
+    const total = ventas.reduce((s, v) => s + (v.estado === 'ACTIVA' ? v.total : 0), 0);
+    return { fecha: dia, total, ventas };
   });
 
   app.get('/api/ventas/:id', async (req) => {

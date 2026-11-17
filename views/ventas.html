@@ -11,7 +11,8 @@
     <span class="marca"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 9c3-3 6 3 9 0s6 3 9 0M3 15c3-3 6 3 9 0s6 3 9 0"/></svg> Río Vivo · Ventas</span>
     <nav class="pestanas" role="tablist">
       <button role="tab" data-vista="nueva">Nueva venta</button>
-      <button role="tab" data-vista="hoy">Ventas de hoy</button>
+      <button role="tab" data-vista="hoy">Ventas del día</button>
+      <button role="tab" data-vista="caja">Caja</button>
     </nav>
     <div class="der">
       <a href="/admin" id="ir-admin" hidden>Administración</a>
@@ -22,6 +23,10 @@
 
   <main>
     <section id="vista-nueva" class="venta">
+      <div class="error aviso-caja" id="sin-caja" role="alert" hidden>
+        <span><b>No hay caja abierta.</b> Abre la caja con su base para poder registrar ventas.</span>
+        <button type="button" class="btn mini" id="ir-caja">Abrir caja</button>
+      </div>
       <div>
         <input type="search" id="buscar" placeholder="Buscar producto o servicio" aria-label="Buscar producto o servicio" style="margin:0">
         <div class="chips" id="categorias"></div>
@@ -62,8 +67,11 @@
 
     <section id="vista-hoy" hidden>
       <div class="cabecera">
-        <h2 id="titulo-hoy">Ventas de hoy</h2>
-        <button class="btn mini" id="recargar">Actualizar</button>
+        <h2 id="titulo-hoy">Ventas del día</h2>
+        <div class="fila">
+          <input type="date" id="fecha-ventas" aria-label="Día a consultar" style="margin:0">
+          <button class="btn mini fijo" id="recargar">Actualizar</button>
+        </div>
       </div>
       <div class="kpis">
         <div class="kpi"><span>Total vendido</span><b id="hoy-total"></b></div>
@@ -79,6 +87,50 @@
         </table>
       </div>
     </section>
+
+    <section id="vista-caja" hidden>
+      <div id="caja-cerrada" hidden>
+        <h2>Abrir caja</h2>
+        <p class="tenue">Cuenta el efectivo con el que empieza el turno. Sin caja abierta no se pueden registrar ventas.</p>
+        <form class="panel fila angosto" id="form-abrir">
+          <label>Base inicial en efectivo (pesos)
+            <input type="number" id="base-inicial" min="0" step="1" inputmode="numeric" required>
+          </label>
+          <button class="btn primario fijo">Abrir caja</button>
+        </form>
+      </div>
+
+      <div id="caja-abierta" hidden>
+        <div class="cabecera">
+          <h2 id="titulo-caja"></h2>
+          <button class="btn mini" id="recargar-caja">Actualizar</button>
+        </div>
+        <div class="kpis">
+          <div class="kpi"><span>Base inicial</span><b id="caja-base"></b></div>
+          <div class="kpi"><span>Ventas en efectivo</span><b id="caja-efectivo"></b></div>
+          <div class="kpi"><span>Efectivo esperado en el cajón</span><b id="caja-esperado"></b></div>
+          <div class="kpi"><span>Tarjeta</span><b id="caja-tarjeta"></b></div>
+          <div class="kpi"><span>Transferencia</span><b id="caja-transferencia"></b></div>
+        </div>
+        <form class="panel apilado angosto" id="form-cerrar">
+          <h3>Cerrar caja</h3>
+          <label>Efectivo contado en el cajón (pesos)
+            <input type="number" id="contado" min="0" step="1" inputmode="numeric" required>
+          </label>
+          <p id="diferencia-viva" class="tenue" style="margin:0" aria-live="polite"></p>
+          <label>Nota (opcional) <input type="text" id="nota-cierre" maxlength="200"></label>
+          <button class="btn primario">Cerrar caja</button>
+        </form>
+      </div>
+
+      <h3 id="titulo-cajas" style="margin:24px 0 8px;font-size:1rem">Mis cajas</h3>
+      <div class="panel tabla-caja">
+        <table>
+          <thead><tr><th>N.º</th><th>Cajero</th><th>Apertura</th><th>Cierre</th><th class="num">Esperado</th><th class="num">Contado</th><th class="num">Diferencia</th></tr></thead>
+          <tbody id="tabla-cajas"></tbody>
+        </table>
+      </div>
+    </section>
   </main>
 
   <!-- En pantallas angostas la venta queda debajo del catálogo: esta barra la mantiene a la vista. -->
@@ -89,9 +141,25 @@
   <dialog id="dlg-ticket" aria-label="Ticket de venta">
     <div class="ticket" id="ticket"></div>
     <div class="botones">
+      <button class="btn peligro" id="anular" hidden>Anular venta</button>
       <button class="btn" id="imprimir">Imprimir</button>
       <button class="btn primario" id="cerrar-ticket">Listo</button>
     </div>
+  </dialog>
+
+  <dialog id="dlg-anular">
+    <form id="form-anular">
+      <h2 id="titulo-anular">Anular venta</h2>
+      <p class="tenue" style="margin:0">La venta no se borra: queda marcada como anulada, deja de contar en caja y reportes, y se repone el inventario que descontó.</p>
+      <label>Motivo (obligatorio)
+        <textarea id="motivo-anular" minlength="5" maxlength="200" required></textarea>
+      </label>
+      <p class="error" id="error-anular" role="alert" hidden></p>
+      <div class="botones">
+        <button type="button" class="btn" id="cancelar-anular">Cancelar</button>
+        <button class="btn rojo">Anular venta</button>
+      </div>
+    </form>
   </dialog>
 
   <script src="/static/common.js"></script>

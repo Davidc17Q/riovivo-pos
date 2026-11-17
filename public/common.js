@@ -75,6 +75,53 @@ function confirmar(texto, etiqueta = 'Confirmar') {
   });
 }
 
+function textoDiferencia(dif) {
+  return dif === 0 ? 'Cuadra exacto' : dif > 0 ? `Sobrante ${cop(dif)}` : `Faltante ${cop(-dif)}`;
+}
+
+/** Cuadre de una caja. Abierta: totales en vivo. Cerrada: lo que se guardó al cerrar. */
+function htmlCuadre(c) {
+  const q = c.cuadre;
+  const cerrada = c.estado === 'CERRADA';
+  return `
+    <h3>Cuadre de caja N.º ${c.id}</h3>
+    <p class="centro tenue chico">${esc(c.usuario.nombre)}<br>Abierta: ${esc(fechaHora(c.abiertaEn))}<br>
+      ${cerrada ? `Cerrada: ${esc(fechaHora(c.cerradaEn))} por ${esc(c.cerradaPor?.nombre)}` : 'Aún abierta'}</p>
+    <div class="totales">
+      <div><span>Base inicial</span><span>${cop(q.base)}</span></div>
+      <div><span>+ Ventas en efectivo</span><span>${cop(q.efectivo)}</span></div>
+      <div><b>Efectivo esperado</b><b>${cop(q.efectivoEsperado)}</b></div>
+      ${cerrada ? `<div><span>Efectivo contado</span><span>${cop(q.efectivoContado)}</span></div>
+      <div class="total ${q.diferencia < 0 ? 'falta' : ''}"><span>Diferencia</span><span>${textoDiferencia(q.diferencia)}</span></div>` : ''}
+    </div>
+    <div class="totales">
+      <div><span>Ventas con tarjeta</span><span>${cop(q.tarjeta)}</span></div>
+      <div><span>Ventas por transferencia</span><span>${cop(q.transferencia)}</span></div>
+      <div><b>Total vendido · ${q.ventas} ${q.ventas === 1 ? 'venta' : 'ventas'}</b><b>${cop(q.totalVentas)}</b></div>
+      ${q.anuladas ? `<div class="tenue chico"><span>Anuladas (no cuentan): ${q.anuladas}</span><span>${cop(q.totalAnulado)}</span></div>` : ''}
+    </div>
+    ${q.anuladasTrasCierre.ventas ? `<p class="error">Después del cierre se anularon ${q.anuladasTrasCierre.ventas} venta(s) por ${cop(q.anuladasTrasCierre.total)}. El cuadre guardado no cambia.</p>` : ''}
+    ${c.nota ? `<p class="tenue chico">Nota: ${esc(c.nota)}</p>` : ''}`;
+}
+
+/** Filas de la tabla de cajas (ventas y administración). */
+function filasCajas(cajas, conCerrar = false) {
+  if (!cajas.length) return '<tr><td colspan="7" class="vacio">Aún no hay cajas.</td></tr>';
+  return cajas.map((c) => {
+    const q = c.cuadre;
+    const cerrada = c.estado === 'CERRADA';
+    return `<tr class="clic" data-caja="${c.id}" tabindex="0">
+      <td>${c.id}</td><td>${esc(c.usuario.nombre)}</td>
+      <td class="chico">${esc(fechaHora(c.abiertaEn))}</td>
+      <td class="chico">${cerrada ? esc(fechaHora(c.cerradaEn)) : '<span class="etiqueta">Abierta</span>'}</td>
+      <td class="num">${cop(q.efectivoEsperado)}</td>
+      <td class="num">${cerrada ? cop(q.efectivoContado) : '—'}</td>
+      <td class="num">${cerrada
+        ? `<span class="etiqueta ${q.diferencia < 0 ? 'rojo' : q.diferencia > 0 ? 'gris' : ''}">${textoDiferencia(q.diferencia)}</span>`
+        : conCerrar ? `<button class="btn mini" data-cerrar-caja="${c.id}">Cerrar</button>` : '—'}</td></tr>`;
+  }).join('');
+}
+
 /** Suma días a una fecha "AAAA-MM-DD". */
 function sumarDias(dia, n) {
   const d = new Date(`${dia}T12:00:00Z`);
