@@ -1,0 +1,165 @@
+// Área de administración (solo rol ADMIN): catálogo, usuarios, inventario y reportes.
+import type { FastifyInstance } from 'fastify';
+import bcrypt from 'bcryptjs';
+import { Prisma } from '@prisma/client';
+import { prisma } from '../db';
+import { soloAdmin } from '../auth';
+import {
+  ErrorHttp, UN_DIA_MS, ZONA, booleano, entero, fecha, idDeUrl, inicioDelDia, objeto, opcion, texto,
+} from '../util';
+
+const PRECIO_MAXIMO = 100_000_000;
+const STOCK_MAXIMO = 1_000_000;
+const ROLES = ['ADMIN', 'VENDEDOR'] as const;
+const TIPOS_MANUALES = ['ENTRADA', 'SALIDA', 'AJUSTE'] as const;
+
+const usuarioPublico = { id: true, usuario: true, nombre: true, rol: true, activo: true, creadoEn: true } as const;
+
+function datosProducto(body: unknown) {
+  const b = objeto(body);
+  return {
+    nombre: texto(b.nombre, 'Nombre', 1, 80),
+    categoria: texto(b.categoria, 'Categoría', 1, 40),
+    precio: entero(b.precio, 'Precio', 0, PRECIO_MAXIMO),
+    activo: booleano(b.activo, 'Activo'),
+    seVende: booleano(b.seVende, 'Se vende'),
+    controlaStock: booleano(b.controlaStock, 'Controla stock'),
+  };
+}
+
+export async function rutasAdmin(app: FastifyInstance) {
+  app.addHook('preHandler', soloAdmin);
+
+  // ---------- Productos ----------
+  app.post('/api/productos', async (req, reply) => {
+    return reply.code(201).send(await prisma.producto.create({ data: datosProducto(req.body) }));
+  });
+
+  app.put('/api/productos/:id', async (req) => {
+    const id = idDeUrl(req.params);
+    const data = datosProducto(req.body);
+    const r = await prisma.producto.updateMany({ where: { id }, data });
+    if (r.count === 0) throw new ErrorHttp(404, 'Producto no encontrado');
+    return prisma.producto.findUnique({ where: { id } });
+  });
+
+  // Solo se borra lo que nunca se vendió; lo vendido se desactiva para conservar el historial.
+  app.delete('/api/productos/:id', async (req) => {
+    const id = idDeUrl(req.params);
+    if ((await prisma.ventaItem.count({ where: { productoId: id } })) > 0) {
+      throw new ErrorHttp(409, 'Este producto ya tiene ventas. Desactívalo en lugar de borrarlo.');
+    }
+    const r = await prisma.producto.deleteMany({ where: { id } });
+    if (r.count === 0) throw new ErrorHttp(404, 'Producto no encontrado');
+    return { ok: true };
+  });
+
+  // ---------- Usuarios ----------
+  app.get('/api/usuarios', async () => prisma.usuario.findMany({ select: usuarioPublico, orderBy: { id: 'asc' } }));
+
+  app.post('/api/usuarios', async (req, reply) => {
+    const b = objeto(req.body);
+    const usuario = texto(b.usuario, 'Usuario', 3, 30).toLowerCase();
+    if (!/^[a-z0-9._-]+$/.test(usuario)) {
+      throw new ErrorHttp(400, 'Usuario: solo letras, números, punto, guion y guion bajo');
+    }
+    const data = {
+      usuario,
+      nombre: texto(b.nombre, 'Nombre', 1, 60),
+      rol: opcion(b.rol, 'Rol', ROLES),
+      claveHash: await bcrypt.hash(texto(b.clave, 'Contraseña', 8, 72), 10),
+    };
+    try {
+      return reply.code(201).send(await prisma.usuario.create({ data, select: usuarioPublico }));
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        throw new ErrorHttp(409, 'Ya existe un usuario con ese nombre de usuario');
+      }
+      throw e;
+    }
+  });
+
+  // Activar/desactivar o cambiar la contraseña.
+  app.put('/api/usuarios/:id', async (req) => {
+    const id = idDeUrl(req.params);
+    const b = objeto(req.body);
+    const data: { activo?: boolean; claveHash?: string } = {};
+    if (b.activo !== undefined) {
+      data.activo = booleano(b.activo, 'Activo');
+      if (!data.activo && id === req.usuario!.id) throw new ErrorHttp(400, 'No puedes desactivar tu propio usuario');
+    }
+    if (b.clave !== undefined) data.claveHash = await bcrypt.hash(texto(b.clave, 'Contraseña', 8, 72), 10);
+    const r = await prisma.usuario.updateMany({ where: { id }, data });
+    if (r.count === 0) throw new ErrorHttp(404, 'Usuario no encontrado');
+    return prisma.usuario.findUnique({ where: { id }, select: usuarioPublico });
+  });
+
+  // ---------- Inventario ----------
+  app.get('/api/inventario/movimientos', async () =>
+    prisma.movimientoInventario.findMany({
+      orderBy: { id: 'desc' },
+      take: 100,
+      include: { producto: { select: { nombre: true } }, usuario: { select: { nombre: true } } },
+    }),
+  );
+
+  // ENTRADA y SALIDA mueven unidades; AJUSTE fija el stock al conteo físico.
+  app.post('/api/inventario/movimientos', async (req, reply) => {
+    const b = objeto(req.body);
+    const productoId = entero(b.productoId, 'Producto', 1, 999_999_999);
+    const tipo = opcion(b.tipo, 'Tipo', TIPOS_MANUALES);
+    const cantidad = entero(b.cantidad, 'Cantidad', tipo === 'AJUSTE' ? 0 : 1, STOCK_MAXIMO);
+    const nota = b.nota === undefined || b.nota === '' ? null : texto(b.nota, 'Nota', 1, 200);
+
+    const mov = await prisma.$transaction(async (tx) => {
+      // Bloquea la fila: una venta simultánea espera y no se pierde ninguna resta.
+      const filas = await tx.$queryRaw<{ stock: number; controlaStock: boolean }[]>`
+        SELECT stock, "controlaStock" FROM "Producto" WHERE id = ${productoId} FOR UPDATE`;
+      const p = filas[0];
+      if (!p) throw new ErrorHttp(404, 'Producto no encontrado');
+      if (!p.controlaStock) throw new ErrorHttp(400, 'Este producto no lleva inventario');
+      const nuevo = tipo === 'AJUSTE' ? cantidad : tipo === 'ENTRADA' ? p.stock + cantidad : p.stock - cantidad;
+      if (nuevo < 0) throw new ErrorHttp(409, `Solo hay ${p.stock} unidades; no se pueden sacar ${cantidad}`);
+      if (nuevo > STOCK_MAXIMO) throw new ErrorHttp(400, 'El stock supera el máximo permitido');
+      await tx.producto.update({ where: { id: productoId }, data: { stock: nuevo } });
+      return tx.movimientoInventario.create({
+        data: { productoId, tipo, cantidad: nuevo - p.stock, stockResultante: nuevo, nota, usuarioId: req.usuario!.id },
+      });
+    });
+    return reply.code(201).send(mov);
+  });
+
+  // ---------- Reportes ----------
+  app.get('/api/reportes', async (req) => {
+    const q = req.query as { desde?: string; hasta?: string };
+    const desde = fecha(q.desde, 'Desde');
+    const hasta = fecha(q.hasta, 'Hasta');
+    const inicio = inicioDelDia(desde);
+    const fin = new Date(inicioDelDia(hasta).getTime() + UN_DIA_MS);
+    if (fin <= inicio) throw new ErrorHttp(400, 'La fecha "desde" no puede ser posterior a "hasta"');
+    if (fin.getTime() - inicio.getTime() > 366 * UN_DIA_MS) throw new ErrorHttp(400, 'El rango máximo es de un año');
+
+    // El día se agrupa en hora de Colombia, no en UTC.
+    const dias = await prisma.$queryRaw<{ dia: string; ventas: bigint; total: bigint }[]>`
+      SELECT to_char("creadaEn" AT TIME ZONE ${ZONA}, 'YYYY-MM-DD') AS dia, COUNT(*) AS ventas, SUM(total) AS total
+      FROM "Venta" WHERE "creadaEn" >= ${inicio} AND "creadaEn" < ${fin}
+      GROUP BY 1 ORDER BY 1`;
+    const metodos = await prisma.venta.groupBy({
+      by: ['metodoPago'],
+      where: { creadaEn: { gte: inicio, lt: fin } },
+      _sum: { total: true, descuento: true },
+      _count: true,
+    });
+
+    const porDia = dias.map((d) => ({ dia: d.dia, ventas: Number(d.ventas), total: Number(d.total) }));
+    return {
+      desde,
+      hasta,
+      total: porDia.reduce((s, d) => s + d.total, 0),
+      ventas: porDia.reduce((s, d) => s + d.ventas, 0),
+      descuentos: metodos.reduce((s, m) => s + (m._sum.descuento ?? 0), 0),
+      porDia,
+      porMetodo: metodos.map((m) => ({ metodo: m.metodoPago, ventas: m._count, total: m._sum.total ?? 0 })),
+    };
+  });
+}

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ventas · Río Vivo POS</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="barra">
+    <span class="marca">Río Vivo · Ventas</span>
+    <nav class="pestanas" role="tablist">
+      <button role="tab" data-vista="nueva">Nueva venta</button>
+      <button role="tab" data-vista="hoy">Ventas de hoy</button>
+    </nav>
+    <div class="der">
+      <a href="/admin" id="ir-admin" hidden>Administración</a>
+      <span id="yo"></span>
+      <button class="enlace" id="salir">Salir</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="vista-nueva" class="venta">
+      <div>
+        <input type="search" id="buscar" placeholder="Buscar producto o servicio" aria-label="Buscar producto o servicio" style="margin:0">
+        <div class="chips" id="categorias"></div>
+        <div class="productos" id="productos"></div>
+      </div>
+
+      <aside class="panel carrito" aria-label="Venta en curso">
+        <h2>Venta en curso</h2>
+        <div id="lineas"></div>
+        <div class="fila" style="margin-top:14px">
+          <label>Descuento
+            <input type="number" id="descuento" min="0" step="1" inputmode="numeric" placeholder="0">
+          </label>
+          <label class="fijo">Tipo
+            <select id="tipo-descuento" style="width:90px">
+              <option value="pesos">$</option>
+              <option value="porcentaje">%</option>
+            </select>
+          </label>
+        </div>
+        <div class="totales">
+          <div><span>Subtotal</span><span class="num" id="subtotal"></span></div>
+          <div><span>Descuento</span><span class="num" id="valor-descuento"></span></div>
+          <div class="total"><span>Total</span><span class="num" id="total"></span></div>
+        </div>
+        <label id="lbl-metodo">Método de pago</label>
+        <div class="segmento" id="metodos" role="group" aria-labelledby="lbl-metodo">
+          <button type="button" data-metodo="EFECTIVO">Efectivo</button>
+          <button type="button" data-metodo="TARJETA">Tarjeta</button>
+          <button type="button" data-metodo="TRANSFERENCIA">Transferencia</button>
+        </div>
+        <button class="btn primario grande" id="cobrar">Registrar venta</button>
+      </aside>
+    </section>
+
+    <section id="vista-hoy" hidden>
+      <div class="cabecera">
+        <h2 id="titulo-hoy">Ventas de hoy</h2>
+        <button class="btn mini" id="recargar">Actualizar</button>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><span>Total vendido</span><b id="hoy-total"></b></div>
+        <div class="kpi"><span>Ventas</span><b id="hoy-cantidad"></b></div>
+      </div>
+      <div class="panel tabla-caja">
+        <table>
+          <thead><tr><th>N.º</th><th>Hora</th><th>Vendedor</th><th>Detalle</th><th>Pago</th><th class="num">Total</th></tr></thead>
+          <tbody id="tabla-hoy"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="dlg-ticket" aria-label="Ticket de venta">
+    <div class="ticket" id="ticket"></div>
+    <div class="botones">
+      <button class="btn" id="imprimir">Imprimir</button>
+      <button class="btn primario" id="cerrar-ticket">Cerrar</button>
+    </div>
+  </dialog>
+
+  <script src="/static/common.js"></script>
+  <script src="/static/ventas.js"></script>
+</body>
+</html>

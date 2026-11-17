@@ -1,0 +1,102 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Rol {
+  ADMIN
+  VENDEDOR
+}
+
+enum MetodoPago {
+  EFECTIVO
+  TARJETA
+  TRANSFERENCIA
+}
+
+enum TipoMovimiento {
+  ENTRADA
+  SALIDA
+  AJUSTE
+  VENTA
+}
+
+model Usuario {
+  id          Int                    @id @default(autoincrement())
+  usuario     String                 @unique
+  nombre      String
+  claveHash   String
+  rol         Rol                    @default(VENDEDOR)
+  activo      Boolean                @default(true)
+  creadoEn    DateTime               @default(now()) @db.Timestamptz(3)
+  ventas      Venta[]
+  movimientos MovimientoInventario[]
+}
+
+// Todo el dinero va en pesos enteros (COP), nunca decimales.
+model Producto {
+  id            Int                    @id @default(autoincrement())
+  nombre        String
+  categoria     String
+  precio        Int
+  activo        Boolean                @default(true)
+  // false = insumo interno: se lleva en inventario pero no aparece en caja.
+  seVende       Boolean                @default(true)
+  controlaStock Boolean                @default(false)
+  stock         Int                    @default(0)
+  creadoEn      DateTime               @default(now()) @db.Timestamptz(3)
+  items         VentaItem[]
+  movimientos   MovimientoInventario[]
+}
+
+model Venta {
+  id          Int                    @id @default(autoincrement())
+  creadaEn    DateTime               @default(now()) @db.Timestamptz(3)
+  usuarioId   Int
+  usuario     Usuario                @relation(fields: [usuarioId], references: [id])
+  subtotal    Int
+  descuento   Int                    @default(0)
+  total       Int
+  metodoPago  MetodoPago
+  items       VentaItem[]
+  movimientos MovimientoInventario[]
+
+  @@index([creadaEn])
+}
+
+// Nombre y precio se copian al vender: el ticket no cambia si luego se edita el producto.
+model VentaItem {
+  id             Int      @id @default(autoincrement())
+  ventaId        Int
+  venta          Venta    @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  productoId     Int
+  producto       Producto @relation(fields: [productoId], references: [id])
+  nombre         String
+  precioUnitario Int
+  cantidad       Int
+  totalLinea     Int
+
+  @@index([ventaId])
+}
+
+model MovimientoInventario {
+  id              Int            @id @default(autoincrement())
+  productoId      Int
+  producto        Producto       @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  tipo            TipoMovimiento
+  // Cambio con signo: positivo entra, negativo sale.
+  cantidad        Int
+  stockResultante Int
+  nota            String?
+  usuarioId       Int
+  usuario         Usuario        @relation(fields: [usuarioId], references: [id])
+  ventaId         Int?
+  venta           Venta?         @relation(fields: [ventaId], references: [id])
+  creadoEn        DateTime       @default(now()) @db.Timestamptz(3)
+
+  @@index([productoId, creadoEn])
+}

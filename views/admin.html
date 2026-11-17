@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Administración · Río Vivo POS</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="barra">
+    <span class="marca">Río Vivo · Administración</span>
+    <nav class="pestanas" role="tablist">
+      <button role="tab" data-vista="productos">Productos</button>
+      <button role="tab" data-vista="inventario">Inventario</button>
+      <button role="tab" data-vista="usuarios">Usuarios</button>
+      <button role="tab" data-vista="reportes">Reportes</button>
+    </nav>
+    <div class="der">
+      <a href="/ventas">Ir a ventas</a>
+      <span id="yo"></span>
+      <button class="enlace" id="salir">Salir</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="vista-productos">
+      <div class="cabecera">
+        <h2>Productos y servicios</h2>
+        <button class="btn primario" id="nuevo-producto">Nuevo producto</button>
+      </div>
+      <div class="panel tabla-caja">
+        <table>
+          <thead><tr><th>Nombre</th><th>Categoría</th><th class="num">Precio</th><th>Inventario</th><th>Estado</th><th></th></tr></thead>
+          <tbody id="tabla-productos"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="vista-inventario" hidden>
+      <div class="cabecera">
+        <h2>Inventario</h2>
+        <span class="tenue chico">Se lleva para los productos marcados con "Lleva inventario".</span>
+      </div>
+      <div class="dos">
+        <div class="panel tabla-caja">
+          <table>
+            <thead><tr><th>Producto</th><th class="num">Stock</th><th></th></tr></thead>
+            <tbody id="tabla-stock"></tbody>
+          </table>
+        </div>
+        <div class="panel tabla-caja">
+          <h3 style="font-size:1rem;margin-bottom:8px">Últimos movimientos</h3>
+          <table>
+            <thead><tr><th>Fecha</th><th>Producto</th><th>Tipo</th><th class="num">Cambio</th><th class="num">Queda</th></tr></thead>
+            <tbody id="tabla-movimientos"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="vista-usuarios" hidden>
+      <div class="cabecera">
+        <h2>Usuarios</h2>
+        <button class="btn primario" id="nuevo-usuario">Nuevo usuario</button>
+      </div>
+      <div class="panel tabla-caja">
+        <table>
+          <thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
+          <tbody id="tabla-usuarios"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="vista-reportes" hidden>
+      <h2>Reporte de ventas</h2>
+      <form class="fila panel" id="form-reporte" style="margin-top:14px">
+        <label>Desde <input type="date" id="desde" required></label>
+        <label>Hasta <input type="date" id="hasta" required></label>
+        <button class="btn primario fijo">Consultar</button>
+      </form>
+      <div class="kpis">
+        <div class="kpi"><span>Total vendido</span><b id="rep-total"></b></div>
+        <div class="kpi"><span>Ventas</span><b id="rep-ventas"></b></div>
+        <div class="kpi"><span>Descuentos otorgados</span><b id="rep-descuentos"></b></div>
+      </div>
+      <div class="dos">
+        <div class="panel tabla-caja">
+          <h3 style="font-size:1rem;margin-bottom:8px">Por día</h3>
+          <table>
+            <thead><tr><th>Día</th><th class="num">Ventas</th><th class="num">Total</th></tr></thead>
+            <tbody id="rep-dias"></tbody>
+          </table>
+        </div>
+        <div class="panel tabla-caja">
+          <h3 style="font-size:1rem;margin-bottom:8px">Por método de pago</h3>
+          <table>
+            <thead><tr><th>Método</th><th class="num">Ventas</th><th class="num">Total</th></tr></thead>
+            <tbody id="rep-metodos"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="dlg-producto">
+    <form id="form-producto">
+      <h2 id="titulo-producto">Nuevo producto</h2>
+      <label>Nombre <input type="text" id="p-nombre" maxlength="80" required></label>
+      <label>Categoría <input type="text" id="p-categoria" maxlength="40" list="lista-categorias" required></label>
+      <datalist id="lista-categorias"></datalist>
+      <label>Precio (pesos) <input type="number" id="p-precio" min="0" max="100000000" step="1" inputmode="numeric" required></label>
+      <label class="check"><input type="checkbox" id="p-vende"> Se vende en caja (desmarca para insumos internos)</label>
+      <label class="check"><input type="checkbox" id="p-stock"> Lleva inventario</label>
+      <label class="check"><input type="checkbox" id="p-activo"> Activo</label>
+      <p class="error" id="error-producto" role="alert" hidden></p>
+      <div class="botones">
+        <button type="button" class="btn" data-cerrar>Cancelar</button>
+        <button class="btn primario">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="dlg-movimiento">
+    <form id="form-movimiento">
+      <h2 id="titulo-movimiento">Movimiento</h2>
+      <label>Tipo
+        <select id="m-tipo">
+          <option value="ENTRADA">Entrada (compra o reposición)</option>
+          <option value="SALIDA">Salida (consumo, daño o pérdida)</option>
+          <option value="AJUSTE">Ajuste (fijar el stock al conteo físico)</option>
+        </select>
+      </label>
+      <label><span id="m-etiqueta">Unidades</span> <input type="number" id="m-cantidad" min="0" step="1" inputmode="numeric" required></label>
+      <label>Nota (opcional) <input type="text" id="m-nota" maxlength="200"></label>
+      <p class="error" id="error-movimiento" role="alert" hidden></p>
+      <div class="botones">
+        <button type="button" class="btn" data-cerrar>Cancelar</button>
+        <button class="btn primario">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="dlg-usuario">
+    <form id="form-usuario">
+      <h2>Nuevo usuario</h2>
+      <label>Nombre completo <input type="text" id="u-nombre" maxlength="60" required></label>
+      <label>Usuario (para ingresar) <input type="text" id="u-usuario" minlength="3" maxlength="30" autocapitalize="none" spellcheck="false" autocomplete="off" required></label>
+      <label>Contraseña (mínimo 8 caracteres) <input type="password" id="u-clave" minlength="8" maxlength="72" autocomplete="new-password" required></label>
+      <label>Rol
+        <select id="u-rol">
+          <option value="VENDEDOR">Vendedor (solo ventas)</option>
+          <option value="ADMIN">Administrador (ventas y administración)</option>
+        </select>
+      </label>
+      <p class="error" id="error-usuario" role="alert" hidden></p>
+      <div class="botones">
+        <button type="button" class="btn" data-cerrar>Cancelar</button>
+        <button class="btn primario">Crear usuario</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/static/common.js"></script>
+  <script src="/static/admin.js"></script>
+</body>
+</html>
