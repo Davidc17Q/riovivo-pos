@@ -12,7 +12,8 @@
     "start": "node dist/server.js",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "test:e2e": "node test/e2e.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

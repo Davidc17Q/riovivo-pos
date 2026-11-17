@@ -116,6 +116,7 @@ public/    styles.css, common.js, ventas.js, admin.js
 | `npm run db:deploy`  | Aplica las migraciones existentes                    |
 | `npm run db:migrate` | Crea una migración nueva tras cambiar `schema.prisma` |
 | `npm run db:seed`    | Carga los datos de prueba (no duplica)               |
+| `npm run test:e2e`   | Prueba de punta a punta (con `npm run dev` corriendo) |
 
 Para empezar con la base vacía: `docker compose down -v`, y luego otra vez
 `docker compose up -d`, `npm run db:deploy` y `npm run db:seed`.
