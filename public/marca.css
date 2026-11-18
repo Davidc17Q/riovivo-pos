@@ -1,0 +1,192 @@
+/* Identidad de Río Vivo Spa sobre la base de styles.css.
+   Solo cambia la piel: misma estructura, mismos botones y en el mismo lugar.
+   Paleta y tipografías tomadas de la carta digital del spa (turquesa, verde agua, azul suave,
+   lila y durazno sobre arena; Quicksand para la marca, Poppins para el texto).
+   Se carga después de styles.css en ventas, administración y login. */
+:root {
+  --verde: #127a86;          /* turquesa profundo: acción principal (contraste AA con blanco) */
+  --verde-claro: #e1f3f4;
+  --agua: #3cb6c3;
+  --fondo: #f6efe7;          /* arena */
+  --panel: #ffffff;
+  --borde: #ebe0d4;
+  --tinta: #1e1b3a;          /* índigo de la marca */
+  --tenue: #625e78;
+  --exito: #2e9e6b;
+  --exito-claro: #e3f5ec;
+  --texto: "Poppins", system-ui, "Segoe UI", Roboto, sans-serif;
+  --marca: "Quicksand", "Poppins", system-ui, sans-serif;
+  --sombra: 0 1px 2px rgba(30, 27, 58, .05), 0 4px 14px rgba(30, 27, 58, .05);
+  --radio: 12px;
+  /* Tonos de categoría: la paleta del spa oscurecida lo justo para leerse sobre blanco. */
+  --c1: #1f93a3; --c2: #4f9e99; --c3: #5a82ad; --c4: #7b6cc4; --c5: #d0745a; --c6: #b98236; --c7: #a8706a;
+}
+
+body {
+  font-family: var(--texto);
+  font-size: 15px;
+  background:
+    radial-gradient(1100px 420px at 90% -140px, rgba(60, 182, 195, .14), transparent 70%),
+    radial-gradient(800px 360px at -10% 110%, rgba(216, 207, 247, .30), transparent 70%),
+    var(--fondo);
+  background-attachment: fixed;
+}
+h1, h2, h3 { font-family: var(--marca); font-weight: 700; letter-spacing: -.005em; }
+
+/* Encabezado claro con el isotipo del loto. */
+.barra {
+  background: rgba(255, 255, 255, .85);
+  backdrop-filter: saturate(1.4) blur(10px);
+  color: var(--tinta);
+  border-bottom: 1px solid var(--borde);
+  padding: 10px 24px;
+}
+.marca { font-family: var(--marca); font-size: 1.15rem; font-weight: 600; color: var(--tinta); gap: 10px; }
+.marca img { width: 34px; height: 34px; flex: none; }
+.marca small { font-weight: 500; color: var(--tenue); font-size: .95rem; }
+.marca small::before { content: "·"; margin: 0 8px 0 2px; color: var(--borde); }
+.pestanas { background: #f3ece3; padding: 4px; border-radius: 11px; }
+.pestanas button { min-height: 36px; color: var(--tenue); border-radius: 8px; }
+.pestanas button[aria-selected=true] { background: #fff; color: var(--verde); box-shadow: 0 1px 3px rgba(30, 27, 58, .12); }
+.barra .der { color: var(--tenue); }
+.barra a, .barra .enlace { color: var(--verde); text-decoration: none; font-weight: 600; }
+.barra a:hover, .barra .enlace:hover { text-decoration: underline; }
+
+main { padding: 24px; }
+
+/* Superficies y controles comunes */
+.panel, .kpi { border-color: transparent; box-shadow: var(--sombra); border-radius: 14px; }
+.kpi b { font-family: var(--marca); font-weight: 700; color: var(--tinta); }
+.btn.primario { background: var(--verde); border-color: var(--verde); }
+.btn.primario:hover:not(:disabled) { background: #0f6873; }
+input[type=text], input[type=password], input[type=number], input[type=date], input[type=search], select, textarea { border-color: var(--borde); }
+input:focus-visible, select:focus-visible, textarea:focus-visible { border-color: var(--agua); outline: 3px solid rgba(60, 182, 195, .25); outline-offset: 0; }
+tr.clic:hover { background: #f3fafa; }
+input[type=search] { min-height: 48px; border-color: transparent; border-radius: 12px; box-shadow: var(--sombra); }
+.etiqueta { background: var(--verde-claro); color: var(--verde); }
+.medidor { background: #eaf4f5; }
+.medidor i { background: linear-gradient(90deg, var(--agua), var(--verde)); }
+.chips button, .rangos button { background: #fff; }
+.rangos button[aria-pressed=true] { background: var(--tinta); border-color: var(--tinta); }
+
+/* Buscador y categorías */
+#buscar {
+  min-height: 52px; padding-left: 44px; border-radius: 14px; background-color: #fff; box-shadow: var(--sombra); border-color: transparent;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23625e78' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: 14px 50%;
+}
+.chips { margin: 14px 0 18px; }
+.chips button { display: inline-flex; align-items: center; gap: 8px; }
+.chips button[data-cat]:not([data-cat=Todas])::before {
+  content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--cat, var(--tenue));
+}
+.chips button[aria-pressed=true] { background: var(--tinta); border-color: var(--tinta); }
+.chips button[aria-pressed=true]::before { box-shadow: 0 0 0 2px rgba(255, 255, 255, .6); }
+
+/* Productos: color e ícono de categoría para encontrar con la vista, precio como dato fuerte. */
+.productos { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.producto {
+  --cat: var(--c1);
+  min-height: 128px; padding: 14px; gap: 12px; border-radius: 14px; border-color: transparent;
+  background: #fff; box-shadow: var(--sombra); overflow: visible;
+  transition: transform .1s ease-out, box-shadow .15s, background-color .15s;
+}
+.producto::before {
+  content: ""; position: absolute; left: 16px; right: 16px; top: 0; height: 3px; border-radius: 0 0 3px 3px;
+  background: var(--cat);
+}
+.producto .icono {
+  display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px;
+  background: color-mix(in srgb, var(--cat) 13%, #fff); color: var(--cat);
+}
+.producto .icono svg { width: 18px; height: 18px; }
+.producto b { font-size: .95rem; font-weight: 500; }
+.producto .pie { flex-wrap: wrap; row-gap: 2px; }
+.producto .precio { margin-left: auto; font-size: 1.02rem; font-weight: 600; color: var(--tinta); }
+.producto:hover:not(:disabled) { border-color: transparent; box-shadow: 0 0 0 1px color-mix(in srgb, var(--cat) 45%, transparent), var(--sombra); }
+.producto:active:not(:disabled) { background: color-mix(in srgb, var(--cat) 8%, #fff); }
+.producto.elegido {
+  border-color: transparent; background: color-mix(in srgb, var(--cat) 7%, #fff);
+  box-shadow: 0 0 0 2px var(--cat), var(--sombra);
+}
+.insignia { background: var(--cat, var(--verde)); box-shadow: 0 0 0 3px var(--fondo); }
+
+/* Venta en curso: se lee como un recibo, el total es el protagonista. */
+.carrito { padding: 0; overflow: hidden; border: 0; border-radius: 18px; box-shadow: 0 2px 4px rgba(30, 27, 58, .05), 0 12px 32px rgba(30, 27, 58, .08); }
+.carrito > .cabecera { padding: 16px 20px 2px; }
+.carrito h2 { font-size: 1.2rem; }
+#lineas { padding: 0 20px; }
+.carrito > .fila { padding: 0 20px; }
+.linea { padding: 8px 0; border-bottom-style: dashed; }
+.linea b { font-weight: 500; }
+.linea .cant button { border-radius: 50%; }
+.carrito .vacio { padding: 26px 8px 22px; }
+.carrito .vacio::before {
+  content: ""; display: block; width: 52px; height: 52px; margin: 0 auto 10px;
+  background: url("/static/img/loto.svg") no-repeat center / contain; opacity: .55;
+}
+.carrito .totales { margin: 14px 0 0; padding: 12px 20px 14px; background: #faf6f1; border-top: 1px solid var(--borde); gap: 4px; color: var(--tenue); }
+.carrito .totales .total {
+  margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--borde); align-items: baseline;
+  color: var(--tinta); font-size: 1rem; font-weight: 600;
+}
+.carrito .totales .total .num { font-family: var(--marca); font-size: 2.1rem; font-weight: 700; letter-spacing: -.02em; color: var(--tinta); }
+.carrito > label, .carrito > .segmento, .carrito > #cobrar { margin-left: 20px; margin-right: 20px; width: auto; }
+.carrito > label { margin-top: 12px; }
+.segmento button {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-height: 54px; border-radius: 12px; font-size: .82rem;
+}
+.segmento svg { width: 20px; height: 20px; }
+.segmento button[aria-pressed=true] { background: var(--verde-claro); border-color: var(--verde); color: var(--verde); box-shadow: inset 0 0 0 1px var(--verde); }
+#cobrar { margin-bottom: 18px; min-height: 56px; border-radius: 14px; font-size: 1.1rem; letter-spacing: .01em; }
+#cobrar:not(:disabled) { background: linear-gradient(135deg, #1aa0ae, var(--verde) 70%); box-shadow: 0 6px 18px rgba(18, 122, 134, .30); }
+#cobrar:disabled { opacity: 1; background: #ece6dd; border-color: #ece6dd; color: var(--tenue); }
+
+.barra-movil { background: var(--tinta); border-radius: 16px; }
+
+/* Confirmación de venta: chulito verde que se dibuja y se va solo (o con un toque). */
+.celebra {
+  position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px;
+  background: rgba(30, 27, 58, .32); backdrop-filter: blur(3px);
+  animation: fundido .18s ease-out; transition: opacity .2s ease-in;
+}
+.celebra.sale { opacity: 0; }
+.celebra-caja {
+  display: grid; justify-items: center; gap: 4px; min-width: 260px; padding: 30px 40px 26px; border-radius: 24px;
+  background: #fff; text-align: center; box-shadow: 0 24px 60px rgba(30, 27, 58, .25);
+  animation: subir .38s cubic-bezier(.2, .9, .3, 1.15);
+}
+.celebra-caja b { font-family: var(--marca); font-size: 1.3rem; color: var(--tinta); }
+.celebra-caja span { color: var(--tenue); font-variant-numeric: tabular-nums; }
+.chulito { width: 96px; height: 96px; margin-bottom: 10px; overflow: visible; }
+.chulito .aro { fill: var(--exito-claro); stroke: var(--exito); stroke-width: 3; stroke-dasharray: 151; animation: aro .5s ease-out backwards; transform-origin: center; transform-box: fill-box; }
+.chulito .onda { fill: none; stroke: var(--exito); stroke-width: 2; opacity: 0; transform-origin: center; transform-box: fill-box; animation: onda .7s .55s ease-out; }
+.chulito .check { fill: none; stroke: var(--exito); stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 34; animation: trazo .32s .38s cubic-bezier(.6, 0, .2, 1) backwards; }
+@keyframes fundido { from { opacity: 0; } }
+@keyframes subir { from { opacity: 0; transform: translateY(14px) scale(.94); } }
+@keyframes aro { from { stroke-dashoffset: 151; fill-opacity: 0; transform: rotate(-90deg); } }
+@keyframes trazo { from { stroke-dashoffset: 34; } }
+@keyframes onda { 0% { opacity: .5; transform: scale(1); } 100% { opacity: 0; transform: scale(1.35); } }
+
+/* Login */
+.login .panel { padding: 28px; border-radius: 20px; }
+.login .logo { display: block; width: 150px; margin: 0 auto 4px; }
+.login h1 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.login form > div:first-child { text-align: center; }
+
+@media (max-width: 900px) {
+  main { padding: 14px; }
+  .barra { padding: 8px 14px; }
+  .marca small { display: none; }
+  .productos { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .producto { min-height: 116px; padding: 12px; gap: 8px; }
+  /* Categorías en una sola fila deslizable: el catálogo queda más arriba. */
+  .chips { flex-wrap: nowrap; overflow-x: auto; margin: 12px -14px 14px; padding: 2px 14px; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chips button { flex: none; }
+  .venta > div { min-width: 0; }
+}
+@media print {
+  .no-imprimir { display: none !important; }
+}

@@ -34,7 +34,8 @@ for (const c of [caja, admin]) { const a = await actual(c); if (a) await c('POST
 
 const np = (await admin('POST', '/api/productos', { nombre: 'E2E Jabón ' + nu, categoria: 'E2E ' + nu, precio: 20000, activo: true, seVende: true, controlaStock: true })).d;
 await admin('POST', '/api/inventario/movimientos', { productoId: np.id, tipo: 'ENTRADA', cantidad: 10 });
-const masaje = (await caja('GET', '/api/productos')).d.find((p) => p.nombre.startsWith('Masaje relajante'));
+// Un servicio sin control de inventario (en el catálogo real, una experiencia del spa).
+const masaje = (await caja('GET', '/api/productos')).d.find((p) => !p.controlaStock && p.precio > 0 && !p.nombre.startsWith('E2E'));
 const rep0 = await reporte();
 
 console.log('— Caja —');

@@ -12,7 +12,8 @@ docker compose up -d          # Postgres local en el puerto 5433
 cp .env.example .env          # en PowerShell: Copy-Item .env.example .env
 npm install
 npm run db:deploy             # crea las tablas
-npm run db:seed               # usuarios y catálogo de prueba
+npm run db:seed               # usuarios de prueba y catálogo real de Río Vivo
+npm run db:catalogo           # (bases ya creadas) sincroniza el catálogo real y apaga el de demo
 npm run dev                   # http://localhost:3100
 ```
 

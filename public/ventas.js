@@ -9,8 +9,61 @@ let ventaEnTicket = null;
 
 const porId = (id) => productos.find((p) => p.id === id);
 
+// Orden de las categorías en caja: primero el spa, luego la comida. Las demás, al final.
+const PRIORIDAD = ['Experiencias', 'Para dos', 'Catering', 'Restaurante', 'Asados y picadas', 'Heladería', 'Bebidas'];
+const rango = (c) => (PRIORIDAD.indexOf(c) + 1 || PRIORIDAD.length + 1);
+const categorias = () => [...new Set(productos.map((p) => p.categoria))].sort((a, b) => rango(a) - rango(b) || a.localeCompare(b));
+
+// Color e ícono por categoría: ayudan a encontrar el producto con la vista.
+const TONOS = ['--c1', '--c4', '--c6', '--c5', '--c7', '--c3', '--c2'];
+const ICONOS = {
+  loto: '<path d="M12 20c-4-3-6-8-5-14 3 2 5 6 5 14Z"/><path d="M12 20c4-3 6-8 5-14-3 2-5 6-5 14Z"/><path d="M12 20c-4 0-8-2-10-6 4-1 7 1 10 6Z"/><path d="M12 20c4 0 8-2 10-6-4-1-7 1-10 6Z"/>',
+  corazon: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z"/>',
+  plato: '<path d="M4 3v8a3 3 0 0 0 6 0V3M7 3v18M17 3c-2 2-3 4-3 8h3v10"/>',
+  fuego: '<path d="M12 21a6 6 0 0 0 6-6c0-4-3-6-4-10-2 2-2 4-2 5-1-1-2-2-2-4-3 3-4 6-4 9a6 6 0 0 0 6 6Z"/>',
+  helado: '<path d="M7 11a5 5 0 0 1 10 0Z"/><path d="m7 11 5 10 5-10"/>',
+  vaso: '<path d="M6 3h12l-1.5 17a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1Z"/><path d="M6.5 9h11"/>',
+  chispa: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>',
+};
+function estiloCategoria(cat) {
+  const c = cat.toLowerCase();
+  const icono = /experien|spa|masaj|terap/.test(c) ? 'loto' : /dos|hosped|pareja|habita/.test(c) ? 'corazon'
+    : /asad|picad|parrill/.test(c) ? 'fuego' : /helad|postre/.test(c) ? 'helado'
+    : /bebid|jugo|bar\b/.test(c) ? 'vaso' : /comid|plato|restaur|catering|almuer/.test(c) ? 'plato' : 'chispa';
+  const orden = categorias().indexOf(cat);
+  return { tono: `var(${TONOS[Math.max(orden, 0) % TONOS.length]})`, icono: ICONOS[icono] };
+}
+
+/** Confirma la venta con un chulito verde que se dibuja; se va solo o con un toque. */
+function celebrar(v) {
+  return new Promise((listo) => {
+    const capa = document.createElement('div');
+    capa.className = 'celebra';
+    capa.setAttribute('role', 'status');
+    capa.innerHTML = `<div class="celebra-caja">
+      <svg class="chulito" viewBox="0 0 52 52" aria-hidden="true">
+        <circle class="onda" cx="26" cy="26" r="24"/><circle class="aro" cx="26" cy="26" r="24"/><path class="check" d="m15 27 7 7 15-16"/>
+      </svg>
+      <b>Venta registrada</b><span>${cop(v.total)} · ${METODOS[v.metodoPago]}</span>
+    </div>`;
+    document.body.append(capa);
+    let hecho = false;
+    const cerrar = () => {
+      if (hecho) return;
+      hecho = true;
+      capa.classList.add('sale');
+      setTimeout(() => { capa.remove(); listo(); }, 200);
+    };
+    const reloj = setTimeout(cerrar, 1400);
+    capa.onclick = () => { clearTimeout(reloj); cerrar(); };
+  });
+}
+
 async function cargarProductos() {
+  const orden = new Map();
   productos = await api('GET', '/api/productos');
+  categorias().forEach((c, i) => orden.set(c, i));
+  productos.sort((a, b) => orden.get(a.categoria) - orden.get(b.categoria)); // estable: conserva el orden por nombre
   // Si un producto se desactivó mientras estaba en la venta, se retira.
   for (const id of carrito.keys()) if (!porId(id)) carrito.delete(id);
   pintarCategorias();
@@ -19,10 +72,10 @@ async function cargarProductos() {
 }
 
 function pintarCategorias() {
-  const cats = ['Todas', ...new Set(productos.map((p) => p.categoria))];
+  const cats = ['Todas', ...categorias()];
   if (!cats.includes(categoria)) categoria = 'Todas';
   $('#categorias').innerHTML = cats
-    .map((c) => `<button type="button" data-cat="${esc(c)}" aria-pressed="${c === categoria}">${esc(c)}</button>`)
+    .map((c) => `<button type="button" data-cat="${esc(c)}" aria-pressed="${c === categoria}" style="--cat:${estiloCategoria(c).tono}">${esc(c)}</button>`)
     .join('');
 }
 
@@ -37,8 +90,10 @@ function pintarProductos() {
         const nota = agotado ? 'Agotado' : p.controlaStock ? `Quedan ${p.stock}` : esc(p.categoria);
         const poco = p.controlaStock && p.stock <= 5 ? 'poco' : 'tenue';
         const cant = carrito.get(p.id);
-        return `<button type="button" class="producto ${cant ? 'elegido' : ''}" data-id="${p.id}" ${agotado ? 'disabled' : ''}>
+        const est = estiloCategoria(p.categoria);
+        return `<button type="button" class="producto ${cant ? 'elegido' : ''}" data-id="${p.id}" ${agotado ? 'disabled' : ''} style="--cat:${est.tono}">
           ${cant ? `<span class="insignia" aria-label="${cant} en la venta">${cant}</span>` : ''}
+          <span class="icono" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${est.icono}</svg></span>
           <b>${esc(p.nombre)}</b>
           <span class="pie"><span class="${poco} chico">${nota}</span><span class="precio">${cop(p.precio)}</span></span>
         </button>`;
@@ -108,6 +163,7 @@ async function cobrar() {
     });
     carrito.clear();
     $('#descuento').value = '';
+    await celebrar(venta);
     mostrarTicket(venta);
   } catch (err) {
     aviso(err.message, true);

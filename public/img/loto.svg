@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <!-- Isotipo de Río Vivo: flor de loto de pétalos translúcidos con una gota de agua al centro. -->
+  <defs>
+    <linearGradient id="gota" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5fd0da"/>
+      <stop offset="1" stop-color="#1f93a3"/>
+    </linearGradient>
+  </defs>
+  <g fill-opacity=".72">
+    <path d="M24 38C15 33 6 27 2 17c9 0 17 5 22 21Z" fill="#76BEBA"/>
+    <path d="M24 38c9-5 18-11 22-21-9 0-17 5-22 21Z" fill="#76BEBA"/>
+    <path d="M24 38C16 31 11 22 12 11c7 4 12 13 12 27Z" fill="#3CB6C3"/>
+    <path d="M24 38c8-7 13-16 12-27-7 4-12 13-12 27Z" fill="#3CB6C3"/>
+    <path d="M24 38c-6-7-7-17 0-31 7 14 6 24 0 31Z" fill="#78A0C4"/>
+  </g>
+  <path d="M24 22c3.2 4.6 5 7.6 5 10.2a5 5 0 0 1-10 0c0-2.6 1.8-5.6 5-10.2Z" fill="url(#gota)"/>
+  <ellipse cx="22.4" cy="31.6" rx="1.2" ry="2" fill="#fff" fill-opacity=".7"/>
+</svg>
