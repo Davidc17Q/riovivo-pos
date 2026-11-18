@@ -234,6 +234,13 @@ input[type=search] { min-height: 48px; border-color: transparent; border-radius:
 .cambio-celebra { margin: 10px 0 0; padding: 10px 16px; border-radius: 12px; background: var(--exito-claro); color: #1f7a50; font-weight: 600; }
 .cambio-celebra b { display: block; font-family: var(--marca); font-size: 1.6rem; color: var(--exito); }
 
+/* Con pago dividido el panel crece: se desplaza por dentro y el botón de cobrar queda siempre a la vista. */
+@media (min-width: 901px) {
+  .carrito { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+  #cobrar { position: sticky; bottom: 14px; z-index: 2; margin-bottom: 14px; box-shadow: 0 0 0 20px #fff; }
+  #cobrar:not(:disabled) { box-shadow: 0 6px 18px rgba(18, 122, 134, .30), 0 0 0 20px #fff; }
+}
+
 /* ---------- Ventas del día: búsqueda, filtros, píldoras y acciones ---------- */
 .filtros-ventas { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 18px 0 12px; }
 .filtros-ventas input[type=search] { flex: 1 1 280px; max-width: 420px; margin: 0; }
