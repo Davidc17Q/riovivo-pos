@@ -69,6 +69,17 @@ input[type=search] { min-height: 48px; border-color: transparent; border-radius:
 .chips button, .rangos button { background: #fff; }
 .rangos button[aria-pressed=true] { background: var(--tinta); border-color: var(--tinta); }
 
+/* Reportes */
+.reporte-columnas { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.apilado-reporte { display: grid; gap: 20px; }
+.exportar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.exportar .btn { display: inline-flex; align-items: center; text-decoration: none; color: var(--tinta); }
+.exportar .btn::before {
+  content: ""; width: 16px; height: 16px; margin-right: 6px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23127a86' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v12m-5-5 5 5 5-5M5 21h14'/%3E%3C/svg%3E") no-repeat center / contain;
+}
+@media (max-width: 900px) { .reporte-columnas { grid-template-columns: 1fr; } }
+
 /* Buscador y categorías */
 #buscar {
   min-height: 52px; padding-left: 44px; border-radius: 14px; background-color: #fff; box-shadow: var(--sombra); border-color: transparent;
@@ -163,6 +174,20 @@ input[type=search] { min-height: 48px; border-color: transparent; border-radius:
 .chulito .aro { fill: var(--exito-claro); stroke: var(--exito); stroke-width: 3; stroke-dasharray: 151; animation: aro .5s ease-out backwards; transform-origin: center; transform-box: fill-box; }
 .chulito .onda { fill: none; stroke: var(--exito); stroke-width: 2; opacity: 0; transform-origin: center; transform-box: fill-box; animation: onda .7s .55s ease-out; }
 .chulito .check { fill: none; stroke: var(--exito); stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 34; animation: trazo .32s .38s cubic-bezier(.6, 0, .2, 1) backwards; }
+/* Tarjeta y transferencia: la figura entra, y el sello verde confirma. */
+.chulito .figura { fill: none; stroke: var(--exito); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; transform-box: fill-box; transform-origin: center; }
+.chulito .figura rect { fill: #fff; }
+.chulito .figura .fino { stroke-width: 2; }
+.chulito .tarjeta { animation: acercar .45s .3s cubic-bezier(.2, .9, .3, 1.1) backwards; }
+.chulito .celular { animation: elevar .45s .3s cubic-bezier(.2, .9, .3, 1.1) backwards; }
+.chulito .senal { stroke-width: 2; animation: senal .6s .7s ease-out backwards; }
+.chulito .sello { transform-box: fill-box; transform-origin: center; animation: sello .32s .62s cubic-bezier(.2, .9, .3, 1.5) backwards; }
+.chulito .sello circle { fill: var(--exito); stroke: #fff; stroke-width: 2; }
+.chulito .sello path { fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+@keyframes acercar { from { opacity: 0; transform: translate(-14px, 6px) rotate(-14deg); } }
+@keyframes elevar { from { opacity: 0; transform: translateY(12px); } }
+@keyframes senal { from { opacity: 0; } }
+@keyframes sello { from { opacity: 0; transform: scale(.3); } }
 @keyframes fundido { from { opacity: 0; } }
 @keyframes subir { from { opacity: 0; transform: translateY(14px) scale(.94); } }
 @keyframes aro { from { stroke-dashoffset: 151; fill-opacity: 0; transform: rotate(-90deg); } }

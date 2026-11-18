@@ -5,6 +5,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../db';
 import { soloAdmin } from '../auth';
 import { conDetalle } from './ventas';
+import { csv } from '../csv';
 import {
   ErrorHttp, UN_DIA_MS, ZONA, booleano, entero, fecha, idDeUrl, inicioDelDia, objeto, opcion, texto,
 } from '../util';
@@ -173,14 +174,37 @@ export async function rutasAdmin(app: FastifyInstance) {
   });
 
   // ---------- Reportes ----------
-  app.get('/api/reportes', async (req) => {
-    const q = req.query as { desde?: string; hasta?: string };
-    const desde = fecha(q.desde, 'Desde');
-    const hasta = fecha(q.hasta, 'Hasta');
-    const inicio = inicioDelDia(desde);
-    const fin = new Date(inicioDelDia(hasta).getTime() + UN_DIA_MS);
-    if (fin <= inicio) throw new ErrorHttp(400, 'La fecha "desde" no puede ser posterior a "hasta"');
-    if (fin.getTime() - inicio.getTime() > 366 * UN_DIA_MS) throw new ErrorHttp(400, 'El rango máximo es de un año');
+  app.get('/api/reportes', async (req) => calcularReporte(rangoReporte(req.query)));
+
+  // Exportación a CSV (Excel): "resumen" replica la pantalla; "detalle" trae una fila por
+  // producto vendido, incluidas las anuladas, para que el contador pueda filtrar y cruzar.
+  app.get('/api/reportes/exportar', async (req, reply) => {
+    const q = req.query as { tipo?: string };
+    const tipo = opcion(q.tipo, 'Tipo', ['resumen', 'detalle'] as const);
+    const rango = rangoReporte(req.query);
+    const contenido = tipo === 'resumen' ? csvResumen(await calcularReporte(rango)) : await csvDetalle(rango);
+    return reply
+      .header('Content-Type', 'text/csv; charset=utf-8')
+      .header('Content-Disposition', `attachment; filename="riovivo-${tipo}-${rango.desde}_a_${rango.hasta}.csv"`)
+      .header('Cache-Control', 'no-store')
+      .send(contenido);
+  });
+}
+
+type Rango = { desde: string; hasta: string; inicio: Date; fin: Date };
+
+function rangoReporte(query: unknown): Rango {
+  const q = query as { desde?: string; hasta?: string };
+  const desde = fecha(q.desde, 'Desde');
+  const hasta = fecha(q.hasta, 'Hasta');
+  const inicio = inicioDelDia(desde);
+  const fin = new Date(inicioDelDia(hasta).getTime() + UN_DIA_MS);
+  if (fin <= inicio) throw new ErrorHttp(400, 'La fecha "desde" no puede ser posterior a "hasta"');
+  if (fin.getTime() - inicio.getTime() > 366 * UN_DIA_MS) throw new ErrorHttp(400, 'El rango máximo es de un año');
+  return { desde, hasta, inicio, fin };
+}
+
+async function calcularReporte({ desde, hasta, inicio, fin }: Rango) {
 
     // El día se agrupa en hora de Colombia, no en UTC.
     const dias = await prisma.$queryRaw<{ dia: string; ventas: bigint; total: bigint }[]>`
@@ -232,5 +256,60 @@ export async function rutasAdmin(app: FastifyInstance) {
       porVendedor: vendedores.map((v) => ({ ...v, ventas: Number(v.ventas), total: Number(v.total) })),
       anuladas: { ventas: anuladas._count, total: anuladas._sum.total ?? 0 },
     };
+}
+
+const METODOS: Record<string, string> = { EFECTIVO: 'Efectivo', TARJETA: 'Tarjeta', TRANSFERENCIA: 'Transferencia' };
+const fmtDia = new Intl.DateTimeFormat('en-CA', { timeZone: ZONA, year: 'numeric', month: '2-digit', day: '2-digit' });
+const fmtHora = new Intl.DateTimeFormat('en-GB', { timeZone: ZONA, hour: '2-digit', minute: '2-digit', hour12: false });
+
+function csvResumen(r: Awaited<ReturnType<typeof calcularReporte>>): string {
+  return csv([
+    ['Reporte de ventas · Río Vivo Spa'],
+    ['Desde', r.desde, 'Hasta', r.hasta],
+    [],
+    ['Indicador', 'Valor'],
+    ['Total vendido', r.total],
+    ['Ventas', r.ventas],
+    ['Descuentos otorgados', r.descuentos],
+    ['Ventas anuladas (no cuentan)', r.anuladas.ventas],
+    ['Valor anulado', r.anuladas.total],
+    [],
+    ['Por día', 'Ventas', 'Total'],
+    ...r.porDia.map((d) => [d.dia, d.ventas, d.total]),
+    [],
+    ['Por método de pago', 'Ventas', 'Total'],
+    ...r.porMetodo.map((m) => [METODOS[m.metodo] ?? m.metodo, m.ventas, m.total]),
+    [],
+    ['Por producto (antes de descuentos)', 'Categoría', 'Cantidad', 'Total'],
+    ...r.porProducto.map((p) => [p.nombre, p.categoria, p.cantidad, p.total]),
+    [],
+    ['Por categoría (antes de descuentos)', 'Cantidad', 'Total'],
+    ...r.porCategoria.map((c) => [c.categoria, c.cantidad, c.total]),
+    [],
+    ['Por vendedor', 'Ventas', 'Total'],
+    ...r.porVendedor.map((v) => [v.nombre, v.ventas, v.total]),
+  ]);
+}
+
+async function csvDetalle({ inicio, fin }: Rango): Promise<string> {
+  const ventas = await prisma.venta.findMany({
+    where: { creadaEn: { gte: inicio, lt: fin } },
+    orderBy: { id: 'asc' },
+    include: {
+      usuario: { select: { nombre: true } },
+      items: { orderBy: { id: 'asc' }, include: { producto: { select: { categoria: true } } } },
+    },
   });
+  const filas = ventas.flatMap((v) =>
+    v.items.map((i) => [
+      v.id, fmtDia.format(v.creadaEn), fmtHora.format(v.creadaEn), v.usuario.nombre, METODOS[v.metodoPago],
+      v.estado === 'ACTIVA' ? 'Activa' : 'Anulada', i.nombre, i.producto.categoria, i.cantidad, i.precioUnitario,
+      i.totalLinea, v.subtotal, v.descuento, v.total, v.motivoAnulacion,
+    ]),
+  );
+  return csv([
+    ['N.º venta', 'Fecha', 'Hora', 'Vendedor', 'Método de pago', 'Estado', 'Producto', 'Categoría', 'Cantidad',
+      'Precio unitario', 'Total línea', 'Subtotal de la venta', 'Descuento de la venta', 'Total de la venta', 'Motivo de anulación'],
+    ...filas,
+  ]);
 }

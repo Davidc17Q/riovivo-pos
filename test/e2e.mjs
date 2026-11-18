@@ -10,8 +10,9 @@ function cliente() {
       headers: { ...(cuerpo ? { 'Content-Type': 'application/json' } : {}), ...(cookie ? { cookie } : {}) },
       body: cuerpo ? JSON.stringify(cuerpo) : undefined });
     const sc = r.headers.get('set-cookie'); if (sc) cookie = sc.split(';')[0];
-    let d = null; try { d = JSON.parse(await r.text()); } catch {}
-    return { s: r.status, d, loc: r.headers.get('location') };
+    const t = await r.text();
+    let d = null; try { d = JSON.parse(t); } catch {}
+    return { s: r.status, d, t, loc: r.headers.get('location'), ct: r.headers.get('content-type') || '' };
   };
 }
 const anon = cliente(), admin = cliente(), caja = cliente(), otro = cliente();
@@ -97,6 +98,12 @@ const suma = (l) => l.reduce((s, x) => s + x.total, 0);
 ok(suma(rep1.porVendedor) === rep1.total && suma(rep1.porMetodo) === rep1.total && suma(rep1.porDia) === rep1.total, 'día, método y vendedor suman el mismo total');
 ok(suma(rep1.porProducto) === rep1.total + rep1.descuentos && suma(rep1.porCategoria) === suma(rep1.porProducto), 'productos y categorías (antes de descuento) = total + descuentos');
 ok((await caja('GET', `/api/reportes?desde=${hoy}&hasta=${hoy}`)).s === 403, 'vendedor no ve reportes → 403');
+const csvRes = await admin('GET', `/api/reportes/exportar?tipo=resumen&desde=${hoy}&hasta=${hoy}`);
+ok(csvRes.s === 200 && csvRes.ct.startsWith('text/csv') && csvRes.t.includes('Total vendido;'), 'exporta el resumen en CSV para Excel');
+const csvDet = await admin('GET', `/api/reportes/exportar?tipo=detalle&desde=${hoy}&hasta=${hoy}`);
+ok(csvDet.s === 200 && csvDet.t.split(String.fromCharCode(13, 10))[0].includes('N.º venta;Fecha;Hora') && csvDet.t.includes(';Anulada;'), 'exporta el detalle, con las anuladas marcadas');
+ok((await admin('GET', `/api/reportes/exportar?tipo=otro&desde=${hoy}&hasta=${hoy}`)).s === 400, 'tipo de exportación inválido → 400');
+ok((await caja('GET', `/api/reportes/exportar?tipo=detalle&desde=${hoy}&hasta=${hoy}`)).s === 403, 'vendedor no exporta reportes → 403');
 
 console.log('— Cierre y arqueo —');
 ok((await otro('POST', `/api/caja/${cid}/cerrar`, { efectivoContado: 0 })).s === 403, 'vendedor no cierra la caja de otro → 403');

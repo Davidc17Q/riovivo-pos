@@ -221,7 +221,11 @@ alEnviar($('#dlg-usuario'), async () => {
 
 // ---------- Reportes ----------
 async function cargarReporte() {
-  const r = await api('GET', `/api/reportes?desde=${$('#desde').value}&hasta=${$('#hasta').value}`);
+  const rango = `desde=${$('#desde').value}&hasta=${$('#hasta').value}`;
+  const r = await api('GET', `/api/reportes?${rango}`);
+  // La exportación usa exactamente el rango que se está viendo.
+  $('#exportar-resumen').href = `/api/reportes/exportar?tipo=resumen&${rango}`;
+  $('#exportar-detalle').href = `/api/reportes/exportar?tipo=detalle&${rango}`;
   $('#rep-total').textContent = cop(r.total);
   $('#rep-ventas').textContent = r.ventas;
   $('#rep-descuentos').textContent = cop(r.descuentos);
@@ -235,7 +239,7 @@ async function cargarReporte() {
   $('#rep-metodos').innerHTML = r.porMetodo.length
     ? r.porMetodo.map((m) => `<tr><td>${METODOS[m.metodo]} <span class="tenue chico">· ${Math.round((m.total / Math.max(1, r.total)) * 100)} %</span>${medidor(m.total, Math.max(1, r.total))}</td><td class="num">${m.ventas}</td><td class="num"><b>${cop(m.total)}</b></td></tr>`).join('')
     : '<tr><td colspan="3" class="vacio">No hubo ventas en este rango.</td></tr>';
-  $('#rep-productos').innerHTML = ranking(r.porProducto, (p) => `${esc(p.nombre)} <span class="tenue chico">· ${esc(p.categoria)}</span>`, (p) => p.cantidad);
+  $('#rep-productos').innerHTML = ranking(r.porProducto, (p) => `${esc(p.nombre)}<br><span class="tenue chico">${esc(p.categoria)}</span>`, (p) => p.cantidad);
   $('#rep-categorias').innerHTML = ranking(r.porCategoria, (c) => esc(c.categoria), (c) => c.cantidad);
   $('#rep-vendedores').innerHTML = ranking(r.porVendedor, (v) => esc(v.nombre), (v) => v.ventas);
 }

@@ -34,6 +34,15 @@ function estiloCategoria(cat) {
   return { tono: `var(${TONOS[Math.max(orden, 0) % TONOS.length]})`, icono: ICONOS[icono] };
 }
 
+// Figura central de la confirmación según el método de pago: chulito (efectivo),
+// tarjeta que se acerca al datáfono o celular que envía la transferencia, ambas con su sello verde.
+const SELLO = '<g class="sello"><circle cx="39" cy="38" r="8.5"/><path d="m35.2 38.2 2.6 2.6 5-5.2"/></g>';
+const FIGURAS_PAGO = {
+  EFECTIVO: '<path class="check" d="m15 27 7 7 15-16"/>',
+  TARJETA: '<g class="figura tarjeta"><rect x="11" y="16" width="28" height="19" rx="3.5"/><path d="M11 22.5h28"/><path class="fino" d="M15.5 30h7"/></g>' + SELLO,
+  TRANSFERENCIA: '<g class="figura celular"><rect x="16" y="11" width="17" height="29" rx="3.5"/><path class="fino" d="M22.5 35.5h4"/><path class="senal" d="M37 14.5a6 6 0 0 1 0 8M40.5 11.5a10.5 10.5 0 0 1 0 14"/></g>' + SELLO,
+};
+
 /** Confirma la venta con un chulito verde que se dibuja; se va solo o con un toque. */
 function celebrar(v) {
   return new Promise((listo) => {
@@ -42,7 +51,7 @@ function celebrar(v) {
     capa.setAttribute('role', 'status');
     capa.innerHTML = `<div class="celebra-caja">
       <svg class="chulito" viewBox="0 0 52 52" aria-hidden="true">
-        <circle class="onda" cx="26" cy="26" r="24"/><circle class="aro" cx="26" cy="26" r="24"/><path class="check" d="m15 27 7 7 15-16"/>
+        <circle class="onda" cx="26" cy="26" r="24"/><circle class="aro" cx="26" cy="26" r="24"/>${FIGURAS_PAGO[v.metodoPago] ?? FIGURAS_PAGO.EFECTIVO}
       </svg>
       <b>Venta registrada</b><span>${cop(v.total)} · ${METODOS[v.metodoPago]}</span>
     </div>`;

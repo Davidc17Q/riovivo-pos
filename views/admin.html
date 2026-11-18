@@ -92,7 +92,14 @@
     </section>
 
     <section id="vista-reportes" hidden>
-      <h2>Reporte de ventas</h2>
+      <div class="cabecera" style="margin-bottom:0">
+        <h2>Reporte de ventas</h2>
+        <div class="exportar">
+          <span class="tenue chico">Exportar a Excel</span>
+          <a class="btn mini" id="exportar-resumen" download>Resumen</a>
+          <a class="btn mini" id="exportar-detalle" download>Detalle de ventas</a>
+        </div>
+      </div>
       <div class="rangos" id="rangos" role="group" aria-label="Rangos rápidos">
         <button type="button" data-rango="hoy">Hoy</button>
         <button type="button" data-rango="ayer">Ayer</button>
@@ -110,29 +117,23 @@
         <div class="kpi"><span>Descuentos otorgados</span><b id="rep-descuentos"></b></div>
         <div class="kpi"><span>Anuladas (no cuentan)</span><b id="rep-anuladas"></b></div>
       </div>
-      <div class="dos">
-        <div class="panel tabla-caja">
-          <h3 style="font-size:1rem;margin-bottom:8px">Por día</h3>
-          <table>
-            <thead><tr><th>Día</th><th class="num">Ventas</th><th class="num">Total</th></tr></thead>
-            <tbody id="rep-dias"></tbody>
-          </table>
-        </div>
-        <div class="panel tabla-caja">
-          <h3 style="font-size:1rem;margin-bottom:8px">Por método de pago</h3>
-          <table>
-            <thead><tr><th>Método</th><th class="num">Ventas</th><th class="num">Total</th></tr></thead>
-            <tbody id="rep-metodos"></tbody>
-          </table>
-        </div>
-        <div class="panel tabla-caja">
-          <h3 style="font-size:1rem;margin-bottom:8px">Por producto <span class="tenue chico">· antes de descuentos</span></h3>
-          <table>
-            <thead><tr><th>Producto</th><th class="num">Cantidad</th><th class="num">Total</th></tr></thead>
-            <tbody id="rep-productos"></tbody>
-          </table>
-        </div>
-        <div>
+      <!-- Dos columnas independientes: la lista larga de productos no deja huecos bajo las demás. -->
+      <div class="reporte-columnas">
+        <div class="apilado-reporte">
+          <div class="panel tabla-caja">
+            <h3 style="font-size:1rem;margin-bottom:8px">Por día</h3>
+            <table>
+              <thead><tr><th>Día</th><th class="num">Ventas</th><th class="num">Total</th></tr></thead>
+              <tbody id="rep-dias"></tbody>
+            </table>
+          </div>
+          <div class="panel tabla-caja">
+            <h3 style="font-size:1rem;margin-bottom:8px">Por método de pago</h3>
+            <table>
+              <thead><tr><th>Método</th><th class="num">Ventas</th><th class="num">Total</th></tr></thead>
+              <tbody id="rep-metodos"></tbody>
+            </table>
+          </div>
           <div class="panel tabla-caja">
             <h3 style="font-size:1rem;margin-bottom:8px">Por categoría <span class="tenue chico">· antes de descuentos</span></h3>
             <table>
@@ -140,7 +141,7 @@
               <tbody id="rep-categorias"></tbody>
             </table>
           </div>
-          <div class="panel tabla-caja" style="margin-top:20px">
+          <div class="panel tabla-caja">
             <h3 style="font-size:1rem;margin-bottom:8px">Por vendedor</h3>
             <table>
               <thead><tr><th>Vendedor</th><th class="num">Ventas</th><th class="num">Total</th></tr></thead>
@@ -148,6 +149,13 @@
             </table>
           </div>
         </div>
+        <div class="panel tabla-caja">
+            <h3 style="font-size:1rem;margin-bottom:8px">Por producto <span class="tenue chico">· antes de descuentos</span></h3>
+            <table>
+              <thead><tr><th>Producto</th><th class="num">Cantidad</th><th class="num">Total</th></tr></thead>
+              <tbody id="rep-productos"></tbody>
+            </table>
+          </div>
       </div>
     </section>
   </main>
