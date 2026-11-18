@@ -2,7 +2,7 @@
 const ZONA = 'America/Bogota';
 const fmtCop = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 const cop = (n) => fmtCop.format(n);
-const METODOS = { EFECTIVO: 'Efectivo', TARJETA: 'Tarjeta', TRANSFERENCIA: 'Transferencia' };
+const METODOS = { EFECTIVO: 'Efectivo', TARJETA: 'Tarjeta', TRANSFERENCIA: 'Transferencia', MIXTO: 'Mixto' };
 const $ = (sel, raiz = document) => raiz.querySelector(sel);
 
 function esc(v) {

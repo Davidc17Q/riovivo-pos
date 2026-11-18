@@ -3,6 +3,7 @@ let productos = [];
 const carrito = new Map(); // productoId → cantidad
 let categoria = 'Todas';
 let metodo = 'EFECTIVO';
+let dividir = false; // pago repartido entre varios métodos
 let yo = null;
 let caja = null; // caja abierta de este usuario (null = no puede vender)
 let ventaEnTicket = null;
@@ -40,6 +41,7 @@ const SELLO = '<g class="sello"><circle cx="39" cy="38" r="8.5"/><path d="m35.2 
 const FIGURAS_PAGO = {
   EFECTIVO: '<path class="check" d="m15 27 7 7 15-16"/>',
   TARJETA: '<g class="figura tarjeta"><rect x="11" y="16" width="28" height="19" rx="3.5"/><path d="M11 22.5h28"/><path class="fino" d="M15.5 30h7"/></g>' + SELLO,
+  MIXTO: '<path class="check" d="m15 27 7 7 15-16"/>',
   TRANSFERENCIA: '<g class="figura celular"><rect x="16" y="11" width="17" height="29" rx="3.5"/><path class="fino" d="M22.5 35.5h4"/><path class="senal" d="M37 14.5a6 6 0 0 1 0 8M40.5 11.5a10.5 10.5 0 0 1 0 14"/></g>' + SELLO,
 };
 
@@ -53,7 +55,8 @@ function celebrar(v) {
       <svg class="chulito" viewBox="0 0 52 52" aria-hidden="true">
         <circle class="onda" cx="26" cy="26" r="24"/><circle class="aro" cx="26" cy="26" r="24"/>${FIGURAS_PAGO[v.metodoPago] ?? FIGURAS_PAGO.EFECTIVO}
       </svg>
-      <b>Venta registrada</b><span>${cop(v.total)} · ${METODOS[v.metodoPago]}</span>
+      <b>Venta registrada</b><span>${cop(v.total)} · ${esc(textoPago(v))}</span>
+      ${v.cambio ? `<p class="cambio-celebra">Entregar de cambio <b>${cop(v.cambio)}</b></p>` : ''}
     </div>`;
     document.body.append(capa);
     let hecho = false;
@@ -63,7 +66,8 @@ function celebrar(v) {
       capa.classList.add('sale');
       setTimeout(() => { capa.remove(); listo(); }, 200);
     };
-    const reloj = setTimeout(cerrar, 1400);
+    // Con cambio se deja más tiempo para leerlo.
+    const reloj = setTimeout(cerrar, v.cambio ? 3200 : 1400);
     capa.onclick = () => { clearTimeout(reloj); cerrar(); };
   });
 }
@@ -131,6 +135,51 @@ function calcular() {
   return { subtotal, descuento, total: subtotal - descuento };
 }
 
+/** "Efectivo" o, si es mixto, "Efectivo $20.000 + Tarjeta $35.000". */
+function textoPago(v) {
+  if (v.metodoPago !== 'MIXTO' || !v.pagos?.length) return METODOS[v.metodoPago];
+  return v.pagos.map((p) => `${METODOS[p.metodo]} ${cop(p.monto)}`).join(' + ');
+}
+
+const numero = (el) => (el.value === '' ? null : Math.max(0, Math.round(Number(el.value) || 0)));
+
+/** Cómo se paga el total: un método, o el reparto escrito. Incluye la parte en efectivo y el vuelto. */
+function estadoPago(total) {
+  const pagos = dividir
+    ? [...document.querySelectorAll('[data-parte]')].map((el) => ({ metodo: el.dataset.parte, monto: numero(el) ?? 0 })).filter((p) => p.monto > 0)
+    : total > 0 ? [{ metodo, monto: total }] : [];
+  const pagado = pagos.reduce((s, p) => s + p.monto, 0);
+  const enEfectivo = pagos.find((p) => p.metodo === 'EFECTIVO')?.monto ?? 0;
+  const recibido = enEfectivo > 0 ? numero($('#recibido')) : null;
+  return { pagos, falta: total - pagado, enEfectivo, recibido, cambio: recibido === null ? null : recibido - enEfectivo };
+}
+
+function pintarPago(t) {
+  const e = estadoPago(t.total);
+  $('#metodos').hidden = dividir;
+  $('#reparto').hidden = !dividir;
+  $('#dividir').setAttribute('aria-pressed', dividir);
+  $('#dividir').textContent = dividir ? 'Un solo método' : 'Dividir pago';
+  const est = $('#estado-pago');
+  est.className = `estado-pago ${e.falta === 0 ? 'ok' : e.falta < 0 ? 'mal' : ''}`;
+  est.textContent = !t.total ? '' : e.falta > 0 ? `Falta asignar ${cop(e.falta)}` : e.falta < 0 ? `Sobran ${cop(-e.falta)}: ajusta los valores` : 'Pago completo';
+  for (const b of document.querySelectorAll('[data-resto]')) b.hidden = e.falta <= 0;
+
+  $('#efectivo').hidden = !carrito.size || e.enEfectivo === 0;
+  $('#efectivo-a-cobrar').textContent = dividir ? `· efectivo ${cop(e.enEfectivo)}` : '';
+  // Valores rápidos: exacto y los billetes o redondeos más probables por encima del valor.
+  const sugeridos = [...new Set([10000, 50000, 100000].map((m) => Math.ceil((e.enEfectivo + 1) / m) * m))]
+    .filter((v) => v > e.enEfectivo).sort((a, b) => a - b).slice(0, 3);
+  $('#billetes').innerHTML = [['exacto', e.enEfectivo, 'Exacto'], ...sugeridos.map((v) => [v, v, cop(v)])]
+    .map(([k, v, t]) => `<button type="button" data-billete="${k}" aria-pressed="${e.recibido !== null && e.recibido === v}">${t}</button>`).join('');
+  const vuelto = $('#vuelto');
+  vuelto.className = 'vuelto';
+  if (e.recibido === null) vuelto.innerHTML = '<span class="tenue">Escribe con cuánto paga para calcular el cambio.</span>';
+  else if (e.cambio < 0) { vuelto.classList.add('falta'); vuelto.innerHTML = `<span>Faltan</span><b>${cop(-e.cambio)}</b>`; }
+  else vuelto.innerHTML = `<span>Cambio a entregar</span><b>${cop(e.cambio)}</b>`;
+  return e;
+}
+
 function pintarCarrito() {
   $('#lineas').innerHTML = carrito.size
     ? [...carrito].map(([id, cant]) => {
@@ -153,8 +202,13 @@ function pintarCarrito() {
   $('#valor-descuento').textContent = t.descuento ? `− ${cop(t.descuento)}` : cop(0);
   $('#total').textContent = cop(t.total);
   $('#sin-caja').hidden = Boolean(caja);
-  $('#cobrar').disabled = carrito.size === 0 || !caja;
-  $('#cobrar').textContent = !caja ? 'Abre la caja para cobrar' : carrito.size ? `Cobrar ${cop(t.total)}` : 'Agrega productos para cobrar';
+  const e = pintarPago(t);
+  const pagoListo = (!dividir || e.falta === 0) && !(e.cambio !== null && e.cambio < 0);
+  $('#cobrar').disabled = carrito.size === 0 || !caja || !pagoListo;
+  $('#cobrar').textContent = !caja ? 'Abre la caja para cobrar'
+    : !carrito.size ? 'Agrega productos para cobrar'
+    : dividir && e.falta > 0 ? `Falta asignar ${cop(e.falta)}`
+    : `Cobrar ${cop(t.total)}`;
   $('#vaciar').hidden = carrito.size === 0;
   $('#barra-movil').hidden = carrito.size === 0;
   $('#movil-resumen').textContent = `${unidades} ${unidades === 1 ? 'ítem' : 'ítems'} · ${cop(t.total)}`;
@@ -163,15 +217,17 @@ function pintarCarrito() {
 
 async function cobrar() {
   const t = calcular();
+  const e = estadoPago(t.total);
   $('#cobrar').disabled = true; // evita doble registro por doble toque
   try {
     const venta = await api('POST', '/api/ventas', {
       items: [...carrito].map(([productoId, cantidad]) => ({ productoId, cantidad })),
       descuento: t.descuento,
-      metodoPago: metodo,
+      ...(dividir ? { pagos: e.pagos } : { metodoPago: metodo }),
+      ...(e.recibido !== null ? { recibido: e.recibido } : {}),
+      referencia: $('#referencia').value.trim(),
     });
-    carrito.clear();
-    $('#descuento').value = '';
+    limpiarVenta();
     await celebrar(venta);
     mostrarTicket(venta);
   } catch (err) {
@@ -179,6 +235,16 @@ async function cobrar() {
   }
   // Se refresca también la caja: pudo cerrarla un administrador mientras tanto.
   await Promise.all([cargarProductos(), cargarCaja()]).catch(() => {});
+}
+
+/** Deja la venta en curso en blanco, lista para el siguiente cliente. */
+function limpiarVenta() {
+  carrito.clear();
+  dividir = false;
+  for (const id of ['#descuento', '#referencia', '#recibido']) $(id).value = '';
+  for (const el of document.querySelectorAll('[data-parte]')) el.value = '';
+  pintarProductos();
+  pintarCarrito();
 }
 
 // ---------- Caja ----------
@@ -269,7 +335,7 @@ function mostrarTicket(v) {
   $('#ticket').innerHTML = `
     ${anulada ? `<p class="error"><b>VENTA ANULADA</b> · ${esc(fechaHora(v.anuladaEn))} · ${esc(v.anuladaPor?.nombre)}<br>Motivo: ${esc(v.motivoAnulacion)}</p>` : ''}
     <h3>Río Vivo Spa</h3>
-    <p class="centro tenue chico">Santa Fe de Antioquia<br>Venta N.º ${v.id} · ${esc(fechaHora(v.creadaEn))}<br>Atendió: ${esc(v.usuario.nombre)}</p>
+    <p class="centro tenue chico">Santa Fe de Antioquia<br>Venta N.º ${v.id} · ${esc(fechaHora(v.creadaEn))}<br>Atendió: ${esc(v.usuario.nombre)}${v.referencia ? `<br>Para: <b>${esc(v.referencia)}</b>` : ''}</p>
     <table>
       <thead><tr><th>Cant.</th><th>Detalle</th><th class="num">Valor</th></tr></thead>
       <tbody>${v.items.map((i) => `<tr><td>${i.cantidad}</td><td>${esc(i.nombre)}<br><span class="tenue chico">${cop(i.precioUnitario)} c/u</span></td><td class="num">${cop(i.totalLinea)}</td></tr>`).join('')}</tbody>
@@ -278,12 +344,36 @@ function mostrarTicket(v) {
       <div><span>Subtotal</span><span>${cop(v.subtotal)}</span></div>
       ${v.descuento ? `<div><span>Descuento</span><span>− ${cop(v.descuento)}</span></div>` : ''}
       <div class="total"><span>Total</span><span>${cop(v.total)}</span></div>
-      <div><span>Pago</span><span>${METODOS[v.metodoPago]}</span></div>
+      ${v.metodoPago === 'MIXTO' && v.pagos?.length
+        ? v.pagos.map((p) => `<div><span>Pago ${METODOS[p.metodo].toLowerCase()}</span><span>${cop(p.monto)}</span></div>`).join('')
+        : `<div><span>Pago</span><span>${METODOS[v.metodoPago]}</span></div>`}
+      ${v.recibido !== null && v.recibido !== undefined ? `<div><span>Efectivo recibido</span><span>${cop(v.recibido)}</span></div><div><span>Cambio</span><span>${cop(v.cambio ?? 0)}</span></div>` : ''}
     </div>`;
   $('#dlg-ticket').showModal();
 }
 
 let ventasHoy = [];
+let filtroVentas = 'TODAS';
+const BASICOS = ['EFECTIVO', 'TARJETA', 'TRANSFERENCIA'];
+// Pagos de una venta (las anteriores al pago mixto traen uno solo).
+const pagosDe = (v) => (v.pagos?.length ? v.pagos : [{ metodo: v.metodoPago, monto: v.total }]);
+const conMetodo = (m) => (v) => v.estado === 'ACTIVA' && pagosDe(v).some((p) => p.metodo === m);
+const FILTROS = {
+  TODAS: { nombre: 'Todas', cumple: () => true },
+  EFECTIVO: { nombre: 'Efectivo', cumple: conMetodo('EFECTIVO') },
+  TARJETA: { nombre: 'Tarjeta', cumple: conMetodo('TARJETA') },
+  TRANSFERENCIA: { nombre: 'Transferencia', cumple: conMetodo('TRANSFERENCIA') },
+  MIXTO: { nombre: 'Mixto', cumple: (v) => v.estado === 'ACTIVA' && v.metodoPago === 'MIXTO' },
+  ANULADAS: { nombre: 'Anuladas', cumple: (v) => v.estado === 'ANULADA' },
+};
+const ICONO_ACCION = {
+  ver: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+  imprimir: '<path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6Z"/>',
+  anular: '<circle cx="12" cy="12" r="9"/><path d="m5.7 5.7 12.6 12.6"/>',
+};
+const pildora = (m, titulo) => `<span class="pago-pill p-${m.toLowerCase()}"${titulo ? ` title="${esc(titulo)}"` : ''}>${METODOS[m]}</span>`;
+const accion = (tipo, nombre, v) => `<button type="button" class="accion ${tipo}" data-accion="${tipo}" aria-label="${nombre} venta N.º ${v.id}" title="${nombre}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONO_ACCION[tipo]}</svg></button>`;
+
 async function cargarHoy() {
   if (!$('#fecha-ventas').value) $('#fecha-ventas').value = hoyIso();
   const d = await api('GET', `/api/ventas?fecha=${$('#fecha-ventas').value}`);
@@ -294,15 +384,44 @@ async function cargarHoy() {
   $('#hoy-total').textContent = cop(d.total);
   $('#hoy-cantidad').textContent = activas.length;
   // Total por método: es lo que se cuadra contra el cajón, el datáfono y el banco.
-  for (const m of Object.keys(METODOS)) {
-    $(`#hoy-${m}`).textContent = cop(activas.filter((v) => v.metodoPago === m).reduce((s, v) => s + v.total, 0));
+  for (const m of BASICOS) {
+    $(`#hoy-${m}`).textContent = cop(activas.flatMap(pagosDe).filter((p) => p.metodo === m).reduce((s, p) => s + p.monto, 0));
   }
-  $('#tabla-hoy').innerHTML = d.ventas.length
-    ? d.ventas.map((v) => `<tr class="clic ${v.estado === 'ANULADA' ? 'anulada' : ''}" data-id="${v.id}" tabindex="0">
+  pintarHoy();
+}
+
+function pintarHoy() {
+  // Filtros con su conteo; Mixto y Anuladas solo aparecen si hay alguna.
+  $('#filtro-ventas').innerHTML = Object.entries(FILTROS)
+    .map(([k, f]) => [k, f, ventasHoy.filter(f.cumple).length])
+    .filter(([k, , n]) => n > 0 || !['MIXTO', 'ANULADAS'].includes(k) || k === filtroVentas)
+    .map(([k, f, n]) => `<button type="button" data-filtro="${k}" aria-pressed="${k === filtroVentas}">${f.nombre} <span class="cuenta">${n}</span></button>`)
+    .join('');
+  const q = $('#buscar-ventas').value.trim().toLowerCase();
+  const lista = ventasHoy.filter((v) => FILTROS[filtroVentas].cumple(v) && (!q || [
+    String(v.id), v.referencia, v.usuario.nombre, ...v.items.map((i) => i.nombre),
+  ].some((t) => t && t.toLowerCase().includes(q))));
+  const esAdmin = yo.rol === 'ADMIN';
+  $('#tabla-hoy').innerHTML = lista.length
+    ? lista.map((v) => {
+        const anulada = v.estado === 'ANULADA';
+        const pago = anulada ? '<span class="pago-pill p-anulada">Anulada</span>'
+          : pagosDe(v).map((p) => pildora(p.metodo, v.metodoPago === 'MIXTO' ? cop(p.monto) : '')).join('');
+        return `<tr class="clic ${anulada ? 'anulada' : ''}" data-id="${v.id}" tabindex="0">
         <td>${v.id}</td><td>${hora(v.creadaEn)}</td><td>${esc(v.usuario.nombre)}</td>
-        <td>${esc(v.items.map((i) => `${i.cantidad} × ${i.nombre}`).join(', '))}</td>
-        <td>${v.estado === 'ANULADA' ? '<span class="etiqueta rojo">Anulada</span>' : METODOS[v.metodoPago]}</td><td class="num"><b class="tachado">${cop(v.total)}</b></td></tr>`).join('')
-    : '<tr><td colspan="6" class="vacio">No hay ventas este día.</td></tr>';
+        <td>${v.referencia ? `<span class="ref-venta">${esc(v.referencia)}</span>` : ''}${esc(v.items.map((i) => `${i.cantidad} × ${i.nombre}`).join(', '))}</td>
+        <td><span class="pills">${pago}</span></td><td class="num"><b class="tachado">${cop(v.total)}</b></td>
+        <td class="acciones">${accion('ver', 'Ver', v)}${accion('imprimir', 'Reimprimir', v)}${esAdmin && !anulada ? accion('anular', 'Anular', v) : ''}</td></tr>`;
+      }).join('')
+    : `<tr><td colspan="7" class="vacio">${ventasHoy.length ? 'Ninguna venta coincide con la búsqueda.' : 'No hay ventas este día.'}</td></tr>`;
+}
+
+function pedirAnulacion(v) {
+  ventaEnTicket = v;
+  $('#titulo-anular').textContent = `Anular venta N.º ${v.id} · ${cop(v.total)}`;
+  $('#motivo-anular').value = '';
+  $('#error-anular').hidden = true;
+  $('#dlg-anular').showModal();
 }
 
 // Eventos
@@ -324,6 +443,31 @@ $('#lineas').onclick = (e) => {
 };
 $('#descuento').oninput = pintarCarrito;
 $('#tipo-descuento').onchange = pintarCarrito;
+$('#referencia').onkeydown = (e) => e.key === 'Enter' && e.preventDefault();
+$('#dividir').onclick = () => {
+  dividir = !dividir;
+  // Al dividir se parte del método elegido con todo el total; el cajero ajusta desde ahí.
+  for (const el of document.querySelectorAll('[data-parte]')) el.value = '';
+  if (dividir && carrito.size) $(`[data-parte=${metodo}]`).value = calcular().total;
+  $('#recibido').value = '';
+  pintarCarrito();
+  if (dividir) $(`[data-parte=${metodo}]`).select();
+};
+$('#reparto').oninput = pintarCarrito;
+$('#reparto').onclick = (e) => {
+  const b = e.target.closest('[data-resto]');
+  if (!b) return;
+  const el = $(`[data-parte=${b.dataset.resto}]`);
+  el.value = (numero(el) ?? 0) + Math.max(0, estadoPago(calcular().total).falta);
+  pintarCarrito();
+};
+$('#recibido').oninput = pintarCarrito;
+$('#billetes').onclick = (e) => {
+  const b = e.target.closest('[data-billete]');
+  if (!b || b.disabled) return;
+  $('#recibido').value = b.dataset.billete === 'exacto' ? estadoPago(calcular().total).enEfectivo : b.dataset.billete;
+  pintarCarrito();
+};
 $('#metodos').onclick = (e) => {
   const b = e.target.closest('button');
   if (!b) return;
@@ -331,28 +475,29 @@ $('#metodos').onclick = (e) => {
   pintarCarrito();
 };
 $('#cobrar').onclick = cobrar;
-$('#vaciar').onclick = () => {
-  carrito.clear();
-  $('#descuento').value = '';
-  pintarProductos();
-  pintarCarrito();
-};
+$('#vaciar').onclick = limpiarVenta;
 $('#barra-movil').onclick = () => $('.carrito').scrollIntoView({ behavior: 'smooth' });
 $('#recargar').onclick = () => cargarHoy().catch((err) => aviso(err.message, true));
 function abrirFila(e) {
   const tr = e.target.closest('tr[data-id]');
   const v = tr && ventasHoy.find((x) => x.id === Number(tr.dataset.id));
-  if (v) mostrarTicket(v);
+  if (!v) return;
+  const b = e.target.closest('[data-accion]');
+  if (b?.dataset.accion === 'anular') return pedirAnulacion(v);
+  mostrarTicket(v);
+  if (b?.dataset.accion === 'imprimir') requestAnimationFrame(() => window.print());
 }
-$('#tabla-hoy').onclick = abrirFila;
-$('#tabla-hoy').onkeydown = (e) => e.key === 'Enter' && abrirFila(e);
-$('#fecha-ventas').onchange = () => cargarHoy().catch((err) => aviso(err.message, true));
-$('#anular').onclick = () => {
-  $('#titulo-anular').textContent = `Anular venta N.º ${ventaEnTicket.id} · ${cop(ventaEnTicket.total)}`;
-  $('#motivo-anular').value = '';
-  $('#error-anular').hidden = true;
-  $('#dlg-anular').showModal();
+$('#buscar-ventas').oninput = pintarHoy;
+$('#filtro-ventas').onclick = (e) => {
+  const b = e.target.closest('[data-filtro]');
+  if (!b) return;
+  filtroVentas = b.dataset.filtro;
+  pintarHoy();
 };
+$('#tabla-hoy').onclick = abrirFila;
+$('#tabla-hoy').onkeydown = (e) => e.key === 'Enter' && e.target.matches('tr') && abrirFila(e);
+$('#fecha-ventas').onchange = () => cargarHoy().catch((err) => aviso(err.message, true));
+$('#anular').onclick = () => pedirAnulacion(ventaEnTicket);
 $('#cancelar-anular').onclick = () => $('#dlg-anular').close();
 $('#form-anular').onsubmit = async (e) => {
   e.preventDefault();

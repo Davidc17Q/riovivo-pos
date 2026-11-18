@@ -194,6 +194,73 @@ input[type=search] { min-height: 48px; border-color: transparent; border-radius:
 @keyframes trazo { from { stroke-dashoffset: 34; } }
 @keyframes onda { 0% { opacity: .5; transform: scale(1); } 100% { opacity: 0; transform: scale(1.35); } }
 
+/* ---------- Cobro: referencia, pago dividido y vuelto ---------- */
+.oculto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.carrito .referencia { position: relative; display: block; margin: 2px 0 6px; }
+.carrito .referencia svg { position: absolute; left: 11px; top: 50%; width: 16px; height: 16px; transform: translateY(-50%); color: var(--tenue); pointer-events: none; }
+.carrito .referencia input { margin: 0; min-height: 40px; padding-left: 34px; background: #faf6f1; border-color: transparent; font-size: .9rem; }
+.carrito .referencia input:not(:placeholder-shown) { background: var(--verde-claro); color: var(--verde); font-weight: 600; }
+.cabecera-pago { display: flex; align-items: baseline; justify-content: space-between; margin: 12px 20px 0; }
+.cabecera-pago label { margin: 0; }
+.cabecera-pago .texto-btn { color: var(--verde); text-decoration: none; min-height: 32px; }
+.cabecera-pago .texto-btn:hover { color: var(--verde); text-decoration: underline; }
+
+.reparto { display: grid; gap: 6px; margin: 4px 20px 14px; }
+.reparto label { display: grid; grid-template-columns: 104px 1fr auto; align-items: center; gap: 8px; margin: 0; font-weight: 600; font-size: .88rem; color: var(--tinta); }
+.reparto input { margin: 0; min-height: 44px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.reparto .texto-btn { color: var(--verde); text-decoration: none; min-width: 52px; }
+.reparto .texto-btn[hidden] { display: inline-block !important; visibility: hidden; }
+.estado-pago { margin: 2px 0 0; padding: 8px 12px; border-radius: 10px; background: #fff4e8; color: #8a5a1c; font-size: .88rem; font-weight: 600; text-align: center; font-variant-numeric: tabular-nums; }
+.estado-pago:empty { display: none; }
+.estado-pago.ok { background: var(--exito-claro); color: #1f7a50; }
+.estado-pago.mal { background: var(--rojo-claro); color: var(--rojo); }
+
+.efectivo { margin: -2px 20px 14px; padding: 12px; border-radius: 14px; background: #faf6f1; }
+.efectivo > label { margin: 0 0 6px; font-weight: 600; font-size: .88rem; }
+.efectivo #recibido { margin: 0; min-height: 46px; font-size: 1.05rem; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+.billetes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 8px 0 10px; }
+.billetes button {
+  min-height: 42px; border-radius: 10px; border: 1px solid var(--borde); background: #fff;
+  font-weight: 600; font-size: .84rem; font-variant-numeric: tabular-nums; color: var(--tinta);
+  transition: background-color .12s, border-color .12s, color .12s;
+}
+.billetes button:hover:not(:disabled) { border-color: var(--agua); }
+.billetes button[aria-pressed=true] { background: var(--verde-claro); border-color: var(--verde); color: var(--verde); }
+.billetes button:disabled { opacity: .4; }
+.vuelto { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0; font-size: .9rem; color: var(--tinta); }
+.vuelto b { font-family: var(--marca); font-size: 1.5rem; font-weight: 700; color: var(--exito); font-variant-numeric: tabular-nums; }
+.vuelto.falta b { color: var(--rojo); }
+.vuelto .tenue { font-size: .82rem; }
+.cambio-celebra { margin: 10px 0 0; padding: 10px 16px; border-radius: 12px; background: var(--exito-claro); color: #1f7a50; font-weight: 600; }
+.cambio-celebra b { display: block; font-family: var(--marca); font-size: 1.6rem; color: var(--exito); }
+
+/* ---------- Ventas del día: búsqueda, filtros, píldoras y acciones ---------- */
+.filtros-ventas { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 18px 0 12px; }
+.filtros-ventas input[type=search] { flex: 1 1 280px; max-width: 420px; margin: 0; }
+.filtros-ventas .chips { margin: 0; }
+.chips .cuenta { margin-left: 4px; font-weight: 500; opacity: .7; font-variant-numeric: tabular-nums; }
+.chips.filtros button[aria-pressed=true] { background: var(--tinta); border-color: var(--tinta); color: #fff; }
+.pills { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.pago-pill { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: .76rem; font-weight: 600; line-height: 1.5; white-space: nowrap; }
+.p-efectivo { background: #e3f5ec; color: #1f7a50; }
+.p-tarjeta { background: #e6eef7; color: #3f6590; }
+.p-transferencia { background: #efebfb; color: #5f52a8; }
+.p-mixto { background: #fbefe2; color: #8a5a1c; }
+.p-anulada { background: var(--rojo-claro); color: var(--rojo); }
+.tabla-ventas td:nth-child(2), .tabla-ventas td:nth-child(3) { white-space: nowrap; }
+.ref-venta { display: block; font-weight: 600; color: var(--verde); font-size: .84rem; }
+.tabla-ventas td.acciones { width: 1%; white-space: nowrap; text-align: right; padding-top: 4px; padding-bottom: 4px; }
+.accion {
+  display: inline-grid; place-items: center; width: 36px; height: 36px; margin-left: 2px;
+  border: 0; border-radius: 10px; background: transparent; color: var(--tenue);
+  transition: background-color .12s, color .12s;
+}
+.accion svg { width: 18px; height: 18px; }
+.accion:hover { background: var(--verde-claro); color: var(--verde); }
+.accion.anular:hover { background: var(--rojo-claro); color: var(--rojo); }
+tr.anulada .pago-pill { text-decoration: none; }
+@media (hover: none) { .accion { width: 44px; height: 44px; } }
+
 /* Login */
 .login .panel { padding: 28px; border-radius: 20px; }
 .login .logo { display: block; width: 150px; margin: 0 auto 4px; }

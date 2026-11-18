@@ -10,20 +10,18 @@ const conNombres = { usuario: { select: { nombre: true } }, cerradaPor: { select
 
 /** Totales vivos de una caja por método de pago. Las ventas anuladas no suman. */
 async function resumenCaja(db: Db, cajaId: number) {
-  const grupos = await db.venta.groupBy({
-    by: ['metodoPago', 'estado'],
-    where: { cajaId },
-    _sum: { total: true },
-    _count: true,
-  });
+  // Por método sale de los pagos (una venta mixta reparte su total); el conteo, de las ventas.
+  const [porMetodo, grupos] = await Promise.all([
+    db.ventaPago.groupBy({ by: ['metodo'], where: { venta: { cajaId, estado: 'ACTIVA' } }, _sum: { monto: true } }),
+    db.venta.groupBy({ by: ['estado'], where: { cajaId }, _sum: { total: true }, _count: true }),
+  ]);
   const r = { EFECTIVO: 0, TARJETA: 0, TRANSFERENCIA: 0, ventas: 0, anuladas: 0, totalAnulado: 0 };
+  for (const m of porMetodo) if (m.metodo !== 'MIXTO') r[m.metodo] += m._sum.monto ?? 0;
   for (const g of grupos) {
-    const total = g._sum.total ?? 0;
     if (g.estado === 'ANULADA') {
       r.anuladas += g._count;
-      r.totalAnulado += total;
+      r.totalAnulado += g._sum.total ?? 0;
     } else {
-      r[g.metodoPago] += total;
       r.ventas += g._count;
     }
   }

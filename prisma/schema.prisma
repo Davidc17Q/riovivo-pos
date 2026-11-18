@@ -16,6 +16,8 @@ enum MetodoPago {
   EFECTIVO
   TARJETA
   TRANSFERENCIA
+  // Varios métodos en una misma venta: el reparto está en VentaPago.
+  MIXTO
 }
 
 enum TipoMovimiento {
@@ -101,6 +103,12 @@ model Venta {
   descuento       Int                    @default(0)
   total           Int
   metodoPago      MetodoPago
+  pagos           VentaPago[]
+  // Cliente, mesa, cabaña o habitación (opcional, texto libre).
+  referencia      String?
+  // Efectivo que entregó el cliente y lo que se le devolvió (solo si pagó en efectivo).
+  recibido        Int?
+  cambio          Int?
   items           VentaItem[]
   movimientos     MovimientoInventario[]
   // Nula solo en ventas anteriores a que existiera la caja.
@@ -115,6 +123,18 @@ model Venta {
 
   @@index([creadaEn])
   @@index([cajaId])
+}
+
+// Cuánto se pagó con cada método. Suma exactamente el total de la venta.
+// La caja y los reportes cuadran por método a partir de aquí.
+model VentaPago {
+  id      Int        @id @default(autoincrement())
+  ventaId Int
+  venta   Venta      @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  metodo  MetodoPago
+  monto   Int
+
+  @@index([ventaId])
 }
 
 // Nombre y precio se copian al vender: el ticket no cambia si luego se edita el producto.

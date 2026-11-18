@@ -211,11 +211,17 @@ async function calcularReporte({ desde, hasta, inicio, fin }: Rango) {
       SELECT to_char("creadaEn" AT TIME ZONE ${ZONA}, 'YYYY-MM-DD') AS dia, COUNT(*) AS ventas, SUM(total) AS total
       FROM "Venta" WHERE estado = 'ACTIVA' AND "creadaEn" >= ${inicio} AND "creadaEn" < ${fin}
       GROUP BY 1 ORDER BY 1`;
-    const metodos = await prisma.venta.groupBy({
-      by: ['metodoPago'],
+    const descuentos = await prisma.venta.aggregate({
       where: { estado: 'ACTIVA', creadaEn: { gte: inicio, lt: fin } },
-      _sum: { total: true, descuento: true },
+      _sum: { descuento: true },
+    });
+    // Por método sale de los pagos: una venta mixta suma en cada método lo que se pagó con él.
+    const metodos = await prisma.ventaPago.groupBy({
+      by: ['metodo'],
+      where: { venta: { estado: 'ACTIVA', creadaEn: { gte: inicio, lt: fin } } },
+      _sum: { monto: true },
       _count: true,
+      orderBy: { _sum: { monto: 'desc' } },
     });
     // Por producto: valor de las líneas, antes del descuento de la venta.
     const productos = await prisma.$queryRaw<{ id: number; nombre: string; categoria: string; cantidad: bigint; total: bigint }[]>`
@@ -248,9 +254,9 @@ async function calcularReporte({ desde, hasta, inicio, fin }: Rango) {
       hasta,
       total: porDia.reduce((s, d) => s + d.total, 0),
       ventas: porDia.reduce((s, d) => s + d.ventas, 0),
-      descuentos: metodos.reduce((s, m) => s + (m._sum.descuento ?? 0), 0),
+      descuentos: descuentos._sum.descuento ?? 0,
       porDia,
-      porMetodo: metodos.map((m) => ({ metodo: m.metodoPago, ventas: m._count, total: m._sum.total ?? 0 })),
+      porMetodo: metodos.map((m) => ({ metodo: m.metodo, ventas: m._count, total: m._sum.monto ?? 0 })),
       porProducto,
       porCategoria: [...categorias.values()].sort((a, c) => c.total - a.total),
       porVendedor: vendedores.map((v) => ({ ...v, ventas: Number(v.ventas), total: Number(v.total) })),
@@ -258,7 +264,8 @@ async function calcularReporte({ desde, hasta, inicio, fin }: Rango) {
     };
 }
 
-const METODOS: Record<string, string> = { EFECTIVO: 'Efectivo', TARJETA: 'Tarjeta', TRANSFERENCIA: 'Transferencia' };
+const METODOS: Record<string, string> = { EFECTIVO: 'Efectivo', TARJETA: 'Tarjeta', TRANSFERENCIA: 'Transferencia', MIXTO: 'Mixto' };
+const pesos = (n: number) => '$' + n.toLocaleString('es-CO');
 const fmtDia = new Intl.DateTimeFormat('en-CA', { timeZone: ZONA, year: 'numeric', month: '2-digit', day: '2-digit' });
 const fmtHora = new Intl.DateTimeFormat('en-GB', { timeZone: ZONA, hour: '2-digit', minute: '2-digit', hour12: false });
 
@@ -297,18 +304,20 @@ async function csvDetalle({ inicio, fin }: Rango): Promise<string> {
     orderBy: { id: 'asc' },
     include: {
       usuario: { select: { nombre: true } },
+      pagos: { orderBy: { id: 'asc' } },
       items: { orderBy: { id: 'asc' }, include: { producto: { select: { categoria: true } } } },
     },
   });
   const filas = ventas.flatMap((v) =>
     v.items.map((i) => [
-      v.id, fmtDia.format(v.creadaEn), fmtHora.format(v.creadaEn), v.usuario.nombre, METODOS[v.metodoPago],
-      v.estado === 'ACTIVA' ? 'Activa' : 'Anulada', i.nombre, i.producto.categoria, i.cantidad, i.precioUnitario,
+      v.id, fmtDia.format(v.creadaEn), fmtHora.format(v.creadaEn), v.usuario.nombre,
+      v.metodoPago === 'MIXTO' ? v.pagos.map((p) => `${METODOS[p.metodo]} ${pesos(p.monto)}`).join(' + ') : METODOS[v.metodoPago],
+      v.referencia, v.estado === 'ACTIVA' ? 'Activa' : 'Anulada', i.nombre, i.producto.categoria, i.cantidad, i.precioUnitario,
       i.totalLinea, v.subtotal, v.descuento, v.total, v.motivoAnulacion,
     ]),
   );
   return csv([
-    ['N.º venta', 'Fecha', 'Hora', 'Vendedor', 'Método de pago', 'Estado', 'Producto', 'Categoría', 'Cantidad',
+    ['N.º venta', 'Fecha', 'Hora', 'Vendedor', 'Método de pago', 'Referencia', 'Estado', 'Producto', 'Categoría', 'Cantidad',
       'Precio unitario', 'Total línea', 'Subtotal de la venta', 'Descuento de la venta', 'Total de la venta', 'Motivo de anulación'],
     ...filas,
   ]);

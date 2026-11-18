@@ -141,6 +141,25 @@ await caja('POST', '/api/caja/abrir', { baseInicial: 0 });
 const agotar = await Promise.all(Array.from({ length: s + 3 }, () => vender(caja, [{ productoId: np.id, cantidad: 1 }], 'TARJETA')));
 ok(agotar.filter((r) => r.s === 201).length === s && await stockDe(np.id) === 0, `stock ${s} y ${s + 3} ventas simultáneas → pasan ${s}; stock final 0, nunca negativo`);
 
+console.log('— Pago mixto, vuelto y referencia —');
+const unMasaje = [{ productoId: masaje.id, cantidad: 1 }];
+const mixto = (pagos, extra = {}) => otro('POST', '/api/ventas', { items: unMasaje, pagos, ...extra });
+ok((await mixto([{ metodo: 'EFECTIVO', monto: 1000 }])).s === 400, 'pagos que no completan el total → 400');
+ok((await mixto([{ metodo: 'EFECTIVO', monto: M }, { metodo: 'TARJETA', monto: 1 }])).s === 400, 'pagos que superan el total → 400');
+ok((await mixto([{ metodo: 'TARJETA', monto: 1 }, { metodo: 'TARJETA', monto: M - 1 }])).s === 400, 'método repetido en el reparto → 400');
+ok((await mixto([{ metodo: 'EFECTIVO', monto: 1000 }, { metodo: 'TARJETA', monto: M - 1000 }], { recibido: 500 })).s === 400, 'efectivo recibido menor a la parte en efectivo → 400');
+ok((await otro('POST', '/api/ventas', { items: unMasaje, metodoPago: 'TARJETA', recibido: M })).s === 400, '"paga con" sin efectivo → 400');
+const vm = await mixto([{ metodo: 'EFECTIVO', monto: 1000 }, { metodo: 'TARJETA', monto: M - 1000 }], { recibido: 5000, referencia: '  Cabaña 3 ' });
+ok(vm.s === 201 && vm.d.metodoPago === 'MIXTO' && vm.d.pagos.length === 2 && vm.d.cambio === 4000 && vm.d.recibido === 5000 && vm.d.referencia === 'Cabaña 3',
+  'venta mixta con vuelto y referencia', JSON.stringify({ s: vm.s, m: vm.d?.metodoPago, c: vm.d?.cambio }));
+const ve = await otro('POST', '/api/ventas', { items: unMasaje, metodoPago: 'EFECTIVO', recibido: M + 7000 });
+ok(ve.s === 201 && ve.d.cambio === 7000 && ve.d.pagos.length === 1, 'efectivo simple con vuelto');
+const qo = (await actual(otro)).cuadre;
+ok(qo.efectivo === 1000 + M && qo.tarjeta === M - 1000 && qo.efectivoEsperado === 1000 + M, 'la caja reparte la venta mixta por método (el vuelto no suma)', JSON.stringify(qo));
+const repM = await reporte();
+ok(suma(repM.porMetodo) === repM.total, 'reporte por método cuadra con ventas mixtas');
+ok((await admin('GET', `/api/reportes/exportar?tipo=detalle&desde=${hoy}&hasta=${hoy}`)).t.includes('Cabaña 3'), 'el detalle exportado incluye la referencia');
+
 // Limpieza: cajas cerradas, producto y usuario de prueba inactivos.
 for (const c of [caja, otro]) { const a = await actual(c); if (a) await c('POST', `/api/caja/${a.id}/cerrar`, { efectivoContado: 0 }); }
 await admin('PUT', `/api/productos/${np.id}`, { nombre: np.nombre, categoria: np.categoria, precio: 20000, activo: false, seVende: true, controlaStock: true });

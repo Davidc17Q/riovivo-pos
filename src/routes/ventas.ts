@@ -1,13 +1,14 @@
 // Área de ventas: catálogo para caja, registrar venta, ticket y ventas del día.
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '../db';
-import { ErrorHttp, UN_DIA_MS, entero, fecha, hoy, idDeUrl, inicioDelDia, objeto, opcion } from '../util';
+import { ErrorHttp, UN_DIA_MS, entero, fecha, hoy, idDeUrl, inicioDelDia, objeto, opcion, texto } from '../util';
 
 const METODOS = ['EFECTIVO', 'TARJETA', 'TRANSFERENCIA'] as const;
 const TOTAL_MAXIMO = 2_000_000_000; // cabe en un entero de Postgres
 
 export const conDetalle = {
   items: { orderBy: { id: 'asc' } },
+  pagos: { orderBy: { id: 'asc' } },
   usuario: { select: { nombre: true } },
   anuladaPor: { select: { nombre: true } },
 } as const;
@@ -24,7 +25,22 @@ export async function rutasVentas(app: FastifyInstance) {
 
   app.post('/api/ventas', async (req, reply) => {
     const b = objeto(req.body);
-    const metodoPago = opcion(b.metodoPago, 'Método de pago', METODOS);
+    // Pago simple (metodoPago) o repartido entre métodos (pagos: [{ metodo, monto }]).
+    const pagosPedidos = Array.isArray(b.pagos)
+      ? b.pagos.map((crudo) => {
+          const p = objeto(crudo);
+          return { metodo: opcion(p.metodo, 'Método de pago', METODOS), monto: entero(p.monto, 'Monto del pago', 1, TOTAL_MAXIMO) };
+        })
+      : null;
+    if (pagosPedidos && (pagosPedidos.length === 0 || pagosPedidos.length > METODOS.length)) {
+      throw new ErrorHttp(400, 'Indica entre uno y tres pagos');
+    }
+    if (pagosPedidos && new Set(pagosPedidos.map((p) => p.metodo)).size !== pagosPedidos.length) {
+      throw new ErrorHttp(400, 'Cada método de pago puede aparecer una sola vez');
+    }
+    const metodoSimple = pagosPedidos ? null : opcion(b.metodoPago, 'Método de pago', METODOS);
+    const recibido = b.recibido === undefined || b.recibido === null || b.recibido === '' ? null : entero(b.recibido, 'Paga con', 0, TOTAL_MAXIMO);
+    const referencia = typeof b.referencia === 'string' && b.referencia.trim() ? texto(b.referencia.trim(), 'Referencia', 1, 60) : null;
     const descuento = entero(b.descuento ?? 0, 'Descuento', 0, TOTAL_MAXIMO);
     if (!Array.isArray(b.items) || b.items.length === 0 || b.items.length > 100) {
       throw new ErrorHttp(400, 'La venta debe tener entre 1 y 100 productos');
@@ -64,9 +80,27 @@ export async function rutasVentas(app: FastifyInstance) {
       });
       if (subtotal > TOTAL_MAXIMO) throw new ErrorHttp(400, 'El total supera el máximo permitido');
       if (descuento > subtotal) throw new ErrorHttp(400, 'El descuento no puede ser mayor que el subtotal');
+      const total = subtotal - descuento;
+
+      // El reparto debe sumar exactamente el total que calcula el servidor.
+      const pagos = pagosPedidos ?? (total > 0 ? [{ metodo: metodoSimple!, monto: total }] : []);
+      const pagado = pagos.reduce((s, p) => s + p.monto, 0);
+      if (pagado !== total) {
+        throw new ErrorHttp(400, pagado < total ? `Falta por pagar ${total - pagado} pesos` : 'Los pagos superan el total de la venta');
+      }
+      const metodoPago = pagos.length > 1 ? 'MIXTO' : (pagos[0]?.metodo ?? metodoSimple ?? 'EFECTIVO');
+      // Vuelto: solo aplica a la parte en efectivo.
+      const enEfectivo = pagos.find((p) => p.metodo === 'EFECTIVO')?.monto ?? 0;
+      if (recibido !== null && enEfectivo === 0) throw new ErrorHttp(400, '"Paga con" solo aplica a pagos en efectivo');
+      if (recibido !== null && recibido < enEfectivo) throw new ErrorHttp(400, 'El efectivo recibido no alcanza para la parte en efectivo');
+      const cambio = recibido === null ? null : recibido - enEfectivo;
 
       const creada = await tx.venta.create({
-        data: { usuarioId, cajaId, subtotal, descuento, total: subtotal - descuento, metodoPago, items: { create: lineas } },
+        data: {
+          usuarioId, cajaId, subtotal, descuento, total, metodoPago, referencia, recibido, cambio,
+          items: { create: lineas },
+          pagos: { create: pagos },
+        },
         include: conDetalle,
       });
 
