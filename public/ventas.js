@@ -428,7 +428,8 @@ function abrirCaja(e) {
   if (c) mostrarCuadre(c);
 }
 $('#tabla-cajas').onclick = abrirCaja;
-$('#tabla-cajas').onkeydown = (e) => e.key === 'Enter' && abrirCaja(e);
+// Con bloque: un manejador on* que devuelve false cancela la tecla.
+$('#tabla-cajas').onkeydown = (e) => { if (e.key === 'Enter') abrirCaja(e); };
 $('#ir-caja').onclick = () => $('[data-vista=caja]').click();
 
 function mostrarTicket(v) {
@@ -603,7 +604,8 @@ $('#form-cuenta').onsubmit = async (e) => {
   }
   $('#ok-cuenta').disabled = false;
 };
-$('#referencia').onkeydown = (e) => e.key === 'Enter' && e.preventDefault();
+// Con bloque: si devolviera false (cualquier tecla que no sea Enter), el navegador cancelaría la escritura.
+$('#referencia').onkeydown = (e) => { if (e.key === 'Enter') e.preventDefault(); };
 $('#dividir').onclick = () => {
   dividir = !dividir;
   // Al dividir se parte del método elegido con todo el total; el cajero ajusta desde ahí.
@@ -655,7 +657,7 @@ $('#filtro-ventas').onclick = (e) => {
   pintarHoy();
 };
 $('#tabla-hoy').onclick = abrirFila;
-$('#tabla-hoy').onkeydown = (e) => e.key === 'Enter' && e.target.matches('tr') && abrirFila(e);
+$('#tabla-hoy').onkeydown = (e) => { if (e.key === 'Enter' && e.target.matches('tr')) abrirFila(e); };
 $('#fecha-ventas').onchange = () => cargarHoy().catch((err) => aviso(err.message, true));
 $('#anular').onclick = () => pedirAnulacion(ventaEnTicket);
 $('#cancelar-anular').onclick = () => $('#dlg-anular').close();
