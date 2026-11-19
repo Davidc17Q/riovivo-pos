@@ -4,6 +4,8 @@ const carrito = new Map(); // productoId → cantidad
 let categoria = 'Todas';
 let metodo = 'EFECTIVO';
 let dividir = false; // pago repartido entre varios métodos
+let cuentaActiva = null; // cuenta abierta que se está atendiendo (null = venta rápida)
+let cuentas = [];
 let yo = null;
 let caja = null; // caja abierta de este usuario (null = no puede vender)
 let ventaEnTicket = null;
@@ -119,6 +121,7 @@ function cambiar(id, delta) {
   if (!p) return;
   const nueva = (carrito.get(id) ?? 0) + delta;
   if (p.controlaStock && nueva > p.stock) return aviso(`Solo quedan ${p.stock} de ${p.nombre}`, true);
+  if (cuentaActiva) return cambiarEnCuenta(id, Math.max(0, nueva));
   if (nueva <= 0) carrito.delete(id);
   else carrito.set(id, Math.min(nueva, 9999));
   pintarProductos();
@@ -208,8 +211,16 @@ function pintarCarrito() {
   $('#cobrar').textContent = !caja ? 'Abre la caja para cobrar'
     : !carrito.size ? 'Agrega productos para cobrar'
     : dividir && e.falta > 0 ? `Falta asignar ${cop(e.falta)}`
+    : cuentaActiva ? `Cobrar cuenta ${cop(t.total)}`
     : `Cobrar ${cop(t.total)}`;
-  $('#vaciar').hidden = carrito.size === 0;
+  $('#vaciar').hidden = carrito.size === 0 || Boolean(cuentaActiva);
+  $('#modo-cuenta').hidden = !cuentaActiva;
+  $('#nombre-cuenta').textContent = cuentaActiva?.nombre ?? '';
+  $('#titulo-venta').textContent = cuentaActiva ? 'Consumos' : 'Venta en curso';
+  $('.carrito .referencia').hidden = Boolean(cuentaActiva);
+  // Cargar a cuenta no necesita caja abierta: solo se cobra con caja.
+  $('#a-cuenta').hidden = Boolean(cuentaActiva) || carrito.size === 0;
+  $('#cancelar-cuenta').hidden = !cuentaActiva || carrito.size > 0;
   $('#barra-movil').hidden = carrito.size === 0;
   $('#movil-resumen').textContent = `${unidades} ${unidades === 1 ? 'ítem' : 'ítems'} · ${cop(t.total)}`;
   for (const b of document.querySelectorAll('#metodos button')) b.setAttribute('aria-pressed', b.dataset.metodo === metodo);
@@ -219,14 +230,20 @@ async function cobrar() {
   const t = calcular();
   const e = estadoPago(t.total);
   $('#cobrar').disabled = true; // evita doble registro por doble toque
+  const pago = {
+    descuento: t.descuento,
+    ...(dividir ? { pagos: e.pagos } : { metodoPago: metodo }),
+    ...(e.recibido !== null ? { recibido: e.recibido } : {}),
+  };
   try {
-    const venta = await api('POST', '/api/ventas', {
-      items: [...carrito].map(([productoId, cantidad]) => ({ productoId, cantidad })),
-      descuento: t.descuento,
-      ...(dividir ? { pagos: e.pagos } : { metodoPago: metodo }),
-      ...(e.recibido !== null ? { recibido: e.recibido } : {}),
-      referencia: $('#referencia').value.trim(),
-    });
+    // Una cuenta se cobra con lo que tiene guardado en el servidor; la venta rápida, con el carrito.
+    const venta = cuentaActiva
+      ? await api('POST', `/api/cuentas/${cuentaActiva.id}/cobrar`, pago)
+      : await api('POST', '/api/ventas', {
+          ...pago,
+          items: [...carrito].map(([productoId, cantidad]) => ({ productoId, cantidad })),
+          referencia: $('#referencia').value.trim(),
+        });
     limpiarVenta();
     await celebrar(venta);
     mostrarTicket(venta);
@@ -234,12 +251,93 @@ async function cobrar() {
     aviso(err.message, true);
   }
   // Se refresca también la caja: pudo cerrarla un administrador mientras tanto.
-  await Promise.all([cargarProductos(), cargarCaja()]).catch(() => {});
+  await Promise.all([cargarProductos(), cargarCaja(), cargarCuentas()]).catch(() => {});
+}
+
+// ---------- Cuentas abiertas ----------
+const itemsCarrito = () => [...carrito].map(([productoId, cantidad]) => ({ productoId, cantidad }));
+
+/** Pone la cuenta en el panel de venta: sus consumos se ven como el carrito. */
+function usarCuenta(c) {
+  cuentaActiva = c;
+  carrito.clear();
+  for (const i of c.items) carrito.set(i.productoId, i.cantidad);
+  pintarProductos();
+  pintarCarrito();
+}
+
+let enCurso = Promise.resolve();
+/** Cada toque en modo cuenta se guarda en el servidor, en orden. */
+function cambiarEnCuenta(productoId, cantidad) {
+  const id = cuentaActiva.id;
+  enCurso = enCurso.then(async () => {
+    try {
+      const c = carrito.has(productoId)
+        ? await api('PUT', `/api/cuentas/${id}/items/${productoId}`, { cantidad })
+        : await api('POST', `/api/cuentas/${id}/items`, { items: [{ productoId, cantidad }] });
+      if (cuentaActiva?.id === id) usarCuenta(c);
+    } catch (err) {
+      aviso(err.message, true);
+      if (/cobró|cancelada/.test(err.message)) salirDeCuenta();
+    }
+  });
+}
+
+function salirDeCuenta() {
+  limpiarVenta();
+  cargarCuentas().catch(() => {});
+}
+
+async function cargarCuentas() {
+  cuentas = await api('GET', '/api/cuentas');
+  $('#n-cuentas').hidden = cuentas.length === 0;
+  $('#n-cuentas').textContent = cuentas.length;
+  $('#lista-cuentas').innerHTML = cuentas.length
+    ? cuentas.map((c) => `<button type="button" class="cuenta" data-cuenta="${c.id}">
+        <span class="nombre">${esc(c.nombre)}</span>
+        <b class="valor">${cop(c.total)}</b>
+        <span class="tenue chico">${c.unidades} ${c.unidades === 1 ? 'consumo' : 'consumos'} · desde ${hora(c.abiertaEn)} · ${esc(c.abiertaPor.nombre)}</span>
+      </button>`).join('')
+    : '<p class="vacio">No hay cuentas abiertas. Abre una para la cabaña, mesa o cliente que pagará al final.</p>';
+}
+
+async function abrirCuenta(c) {
+  if (!cuentaActiva && carrito.size) {
+    if (!(await confirmar(`Hay productos en la venta en curso. ¿Cargarlos a "${c.nombre}"?`, 'Cargar a la cuenta'))) return;
+    c = await api('POST', `/api/cuentas/${c.id}/items`, { items: itemsCarrito() });
+  }
+  usarCuenta(c);
+  $('[data-vista=nueva]').click();
+}
+
+// Diálogo: "Cargar a una cuenta" (desde la venta rápida) o "Nueva cuenta" (desde la pestaña Cuentas).
+let modoDlgCuenta = 'cargar';
+let cuentaElegida = null;
+function pintarElegirCuenta() {
+  $('#elegir-cuenta').innerHTML = cuentas
+    .map((c) => `<button type="button" data-elegir="${c.id}" aria-pressed="${c.id === cuentaElegida}"><span>${esc(c.nombre)}</span><span class="tenue">${cop(c.total)}</span></button>`)
+    .join('');
+}
+async function dialogoCuenta(modo) {
+  modoDlgCuenta = modo;
+  cuentaElegida = null;
+  await cargarCuentas().catch(() => {});
+  const cargar = modo === 'cargar';
+  $('#titulo-dlg-cuenta').textContent = cargar ? `Cargar ${cop(calcular().subtotal)} a una cuenta` : 'Nueva cuenta';
+  $('#elegir-cuenta').hidden = !cargar || cuentas.length === 0;
+  $('#lbl-nombre-cuenta').textContent = cargar && cuentas.length ? 'O abre una cuenta nueva' : 'Nombre de la cuenta';
+  $('#ok-cuenta').textContent = cargar ? 'Cargar' : 'Abrir cuenta';
+  $('#nombre-nueva-cuenta').value = '';
+  $('#error-cuenta').hidden = true;
+  pintarElegirCuenta();
+  $('#dlg-cuenta').showModal();
+  if (!cargar || !cuentas.length) $('#nombre-nueva-cuenta').focus();
 }
 
 /** Deja la venta en curso en blanco, lista para el siguiente cliente. */
 function limpiarVenta() {
   carrito.clear();
+  cuentaActiva = null;
   dividir = false;
   for (const id of ['#descuento', '#referencia', '#recibido']) $(id).value = '';
   for (const el of document.querySelectorAll('[data-parte]')) el.value = '';
@@ -449,6 +547,62 @@ $('#lineas').onclick = (e) => {
 };
 $('#descuento').oninput = pintarCarrito;
 $('#tipo-descuento').onchange = pintarCarrito;
+$('#a-cuenta').onclick = () => dialogoCuenta('cargar');
+$('#nueva-cuenta').onclick = () => dialogoCuenta('nueva');
+$('#salir-cuenta').onclick = salirDeCuenta;
+$('#cancelar-cuenta').onclick = async () => {
+  if (!(await confirmar(`¿Cancelar la cuenta "${cuentaActiva.nombre}"? No tiene consumos.`, 'Cancelar cuenta'))) return;
+  try {
+    await api('POST', `/api/cuentas/${cuentaActiva.id}/cancelar`);
+    aviso('Cuenta cancelada');
+  } catch (err) {
+    aviso(err.message, true);
+  }
+  salirDeCuenta();
+};
+$('#lista-cuentas').onclick = (e) => {
+  const b = e.target.closest('[data-cuenta]');
+  const c = b && cuentas.find((x) => x.id === Number(b.dataset.cuenta));
+  if (c) abrirCuenta(c).catch((err) => aviso(err.message, true));
+};
+$('#elegir-cuenta').onclick = (e) => {
+  const b = e.target.closest('[data-elegir]');
+  if (!b) return;
+  cuentaElegida = Number(b.dataset.elegir);
+  $('#nombre-nueva-cuenta').value = '';
+  pintarElegirCuenta();
+};
+$('#nombre-nueva-cuenta').oninput = () => {
+  if (cuentaElegida === null) return;
+  cuentaElegida = null;
+  pintarElegirCuenta();
+};
+$('#cancelar-dlg-cuenta').onclick = () => $('#dlg-cuenta').close();
+$('#form-cuenta').onsubmit = async (e) => {
+  e.preventDefault();
+  const nombre = $('#nombre-nueva-cuenta').value.trim();
+  const error = (m) => { $('#error-cuenta').textContent = m; $('#error-cuenta').hidden = false; };
+  if (cuentaElegida === null && !nombre) return error('Elige una cuenta o escribe el nombre de una nueva.');
+  $('#ok-cuenta').disabled = true;
+  try {
+    const items = modoDlgCuenta === 'cargar' ? itemsCarrito() : undefined;
+    const c = cuentaElegida !== null
+      ? await api('POST', `/api/cuentas/${cuentaElegida}/items`, { items })
+      : await api('POST', '/api/cuentas', { nombre, ...(items ? { items } : {}) });
+    $('#dlg-cuenta').close();
+    if (modoDlgCuenta === 'cargar') {
+      limpiarVenta();
+      aviso(`Cargado a ${c.nombre} · total ${cop(c.total)}`);
+      await cargarCuentas();
+    } else {
+      usarCuenta(c);
+      $('[data-vista=nueva]').click();
+    }
+  } catch (err) {
+    error(err.message);
+  }
+  $('#ok-cuenta').disabled = false;
+};
 $('#referencia').onkeydown = (e) => e.key === 'Enter' && e.preventDefault();
 $('#dividir').onclick = () => {
   dividir = !dividir;
@@ -528,10 +682,10 @@ $('#cerrar-ticket').onclick = () => $('#dlg-ticket').close();
   yo = await iniciarSesionUi();
   // Cierre ciego: el vendedor no ve totales en dinero de la caja ni del día.
   document.body.classList.toggle('vendedor', yo.rol !== 'ADMIN');
-  await cargarCaja();
+  await Promise.all([cargarCaja(), cargarCuentas()]);
   $('#ir-admin').hidden = yo.rol !== 'ADMIN';
   iniciarPestanas((vista) => {
-    const cargar = { nueva: () => Promise.all([cargarProductos(), cargarCaja()]), hoy: cargarHoy, caja: cargarVistaCaja };
+    const cargar = { nueva: () => Promise.all([cargarProductos(), cargarCaja()]), cuentas: cargarCuentas, hoy: cargarHoy, caja: cargarVistaCaja };
     cargar[vista]().catch((err) => aviso(err.message, true));
   });
 })();

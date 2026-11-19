@@ -33,6 +33,12 @@ enum EstadoCaja {
   CERRADA
 }
 
+enum EstadoCuenta {
+  ABIERTA
+  COBRADA
+  CANCELADA
+}
+
 enum EstadoVenta {
   ACTIVA
   ANULADA
@@ -51,6 +57,7 @@ model Usuario {
   cajas          SesionCaja[]           @relation("CajaAbiertaPor")
   cajasCerradas  SesionCaja[]           @relation("CajaCerradaPor")
   movimientos    MovimientoInventario[]
+  cuentas        Cuenta[]
 }
 
 // Turno de caja de un usuario. Al cerrar se guarda el cuadre tal como se contó;
@@ -92,6 +99,7 @@ model Producto {
   creadoEn      DateTime               @default(now()) @db.Timestamptz(3)
   items         VentaItem[]
   movimientos   MovimientoInventario[]
+  enCuentas     CuentaItem[]
 }
 
 model Venta {
@@ -120,6 +128,7 @@ model Venta {
   anuladaPorId    Int?
   anuladaPor      Usuario?               @relation("VentaAnuladaPor", fields: [anuladaPorId], references: [id])
   motivoAnulacion String?
+  cuenta          Cuenta?
 
   @@index([creadaEn])
   @@index([cajaId])
@@ -168,4 +177,34 @@ model MovimientoInventario {
   creadoEn        DateTime       @default(now()) @db.Timestamptz(3)
 
   @@index([productoId, creadoEn])
+}
+
+// Cuenta abierta de una cabaña, mesa o cliente: se le van cargando consumos durante
+// el día y se cobra una sola vez. Al cobrarla se crea una venta normal (caja, pagos,
+// inventario y reportes salen de ahí).
+model Cuenta {
+  id           Int          @id @default(autoincrement())
+  nombre       String
+  estado       EstadoCuenta @default(ABIERTA)
+  abiertaEn    DateTime     @default(now()) @db.Timestamptz(3)
+  abiertaPorId Int
+  abiertaPor   Usuario      @relation(fields: [abiertaPorId], references: [id])
+  cerradaEn    DateTime?    @db.Timestamptz(3)
+  ventaId      Int?         @unique
+  venta        Venta?       @relation(fields: [ventaId], references: [id])
+  items        CuentaItem[]
+
+  @@index([estado])
+}
+
+// El precio no se guarda: se cobra al precio vigente al momento de cobrar.
+model CuentaItem {
+  id         Int      @id @default(autoincrement())
+  cuentaId   Int
+  cuenta     Cuenta   @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+  productoId Int
+  producto   Producto @relation(fields: [productoId], references: [id])
+  cantidad   Int
+
+  @@unique([cuentaId, productoId])
 }

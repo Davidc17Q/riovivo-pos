@@ -38,6 +38,27 @@ Son solo para probar. Antes de usar el sistema de verdad, crea usuarios propios 
   cajas de todos, usuarios y reportes (día, método de pago, producto, categoría y vendedor). Un vendedor que abra esta dirección
   vuelve a ventas, y la API le responde 403.
 
+## Cuentas abiertas
+
+Para cabañas, mesas o clientes que consumen durante el día y pagan al final (Ventas → Cuentas).
+
+- Desde la venta rápida, **"Cargar a una cuenta"** pasa los productos a una cuenta existente o abre
+  una nueva con su nombre (por ejemplo "Cabaña 3"). Cargar no necesita caja abierta.
+- Al tocar una cuenta, el panel de venta muestra sus consumos: cada producto que se toque se carga
+  a la cuenta y queda guardado en el servidor, así lo ve cualquier caja.
+- **"Cobrar cuenta"** crea una venta normal con los consumos (al precio vigente), con el nombre de la
+  cuenta como referencia: cuenta en caja, inventario y reportes como cualquier venta. Admite pago
+  dividido y vuelto. Dos cobros simultáneos de la misma cuenta no pasan: solo uno.
+- Una cuenta vacía la cancela cualquiera; con consumos, solo un administrador.
+
+## Despliegue en Railway
+
+`railway.json` ya define el build (`prisma generate && tsc`), las migraciones antes de arrancar
+(`prisma migrate deploy`) y el arranque (`npm start`). En Railway: servicio desde este repositorio
++ base PostgreSQL, con las variables `DATABASE_URL` (referencia a la de Postgres),
+`SESSION_SECRET` (larga y aleatoria) y `NODE_ENV=production`. Los datos iniciales se cargan una
+vez con `npm run db:seed` apuntando a la URL pública de la base.
+
 ## Caja, anulaciones y reportes
 
 ### Caja (apertura, cierre y arqueo)

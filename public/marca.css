@@ -273,6 +273,45 @@ tr.anulada .pago-pill { text-decoration: none; }
 .vendedor #vista-caja thead th:nth-child(5), .vendedor #tabla-cajas td:nth-child(5) { display: none; }
 .ciego-nota { margin: 0; padding: 10px 12px; border-radius: 10px; background: #faf6f1; }
 
+/* ---------- Cuentas abiertas ---------- */
+.contador {
+  display: inline-grid; place-items: center; min-width: 20px; height: 20px; margin-left: 4px; padding: 0 6px;
+  border-radius: 99px; background: var(--c5); color: #fff; font-size: .72rem; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.modo-cuenta {
+  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0 10px;
+  padding: 12px 20px; background: linear-gradient(135deg, #1aa0ae, var(--verde) 70%); color: #fff;
+}
+.modo-cuenta span { grid-column: 1; font-size: .74rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; opacity: .85; }
+.modo-cuenta b { grid-column: 1; font-family: var(--marca); font-size: 1.25rem; line-height: 1.2; overflow-wrap: anywhere; }
+.modo-cuenta .texto-btn { grid-column: 2; grid-row: 1 / span 2; color: #fff; text-decoration: none; border: 1px solid rgba(255, 255, 255, .5); border-radius: 10px; padding: 0 10px; }
+.modo-cuenta .texto-btn:hover { color: #fff; background: rgba(255, 255, 255, .14); }
+.carrito > .a-cuenta { margin: -6px 20px 18px; width: auto; min-height: 46px; border-radius: 12px; border-color: var(--verde); color: var(--verde); background: #fff; font-weight: 600; }
+.carrito > .a-cuenta:hover { background: var(--verde-claro); }
+.carrito > .cancelar-cuenta { margin: -8px auto 14px; }
+
+.cuentas { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.cuenta {
+  display: grid; gap: 4px; text-align: left; padding: 18px; border: 0; border-radius: 16px; background: #fff;
+  box-shadow: var(--sombra); border-top: 4px solid var(--agua); transition: box-shadow .15s, transform .15s;
+}
+.cuenta:hover { box-shadow: 0 2px 4px rgba(30, 27, 58, .06), 0 10px 26px rgba(30, 27, 58, .10); }
+.cuenta:active { transform: scale(.985); }
+.cuenta .nombre { font-family: var(--marca); font-weight: 700; font-size: 1.1rem; color: var(--tinta); overflow-wrap: anywhere; }
+.cuenta .valor { font-family: var(--marca); font-size: 1.6rem; font-weight: 700; color: var(--verde); font-variant-numeric: tabular-nums; }
+#vista-cuentas .vacio { grid-column: 1 / -1; }
+
+#dlg-cuenta { width: min(440px, calc(100vw - 32px)); }
+#dlg-cuenta form { display: grid; gap: 12px; }
+#dlg-cuenta h2 { margin: 0; font-size: 1.2rem; }
+.elegir-cuenta { display: grid; gap: 6px; max-height: 260px; overflow-y: auto; }
+.elegir-cuenta button {
+  display: flex; justify-content: space-between; gap: 10px; min-height: 48px; padding: 0 14px;
+  border: 1px solid var(--borde); border-radius: 12px; background: #fff; font-weight: 600; text-align: left;
+}
+.elegir-cuenta button[aria-pressed=true] { border-color: var(--verde); background: var(--verde-claro); color: var(--verde); box-shadow: inset 0 0 0 1px var(--verde); }
+.elegir-cuenta .tenue { font-variant-numeric: tabular-nums; font-weight: 500; }
+
 /* Login */
 .login .panel { padding: 28px; border-radius: 20px; }
 .login .logo { display: block; width: 150px; margin: 0 auto 4px; }

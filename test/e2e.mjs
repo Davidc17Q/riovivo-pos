@@ -168,6 +168,32 @@ const repM = await reporte();
 ok(suma(repM.porMetodo) === repM.total, 'reporte por método cuadra con ventas mixtas');
 ok((await admin('GET', `/api/reportes/exportar?tipo=detalle&desde=${hoy}&hasta=${hoy}`)).t.includes('Cabaña 3'), 'el detalle exportado incluye la referencia');
 
+console.log('— Cuentas abiertas —');
+const nc = 'E2E Cabaña ' + nu;
+ok((await otro('POST', '/api/cuentas', { nombre: '  ' })).s === 400, 'cuenta sin nombre → 400');
+const cu = await otro('POST', '/api/cuentas', { nombre: nc, items: [{ productoId: masaje.id, cantidad: 1 }] });
+ok(cu.s === 201 && cu.d.estado === 'ABIERTA' && cu.d.total === M, 'abrir cuenta con un consumo');
+ok((await caja('POST', '/api/cuentas', { nombre: nc.toUpperCase() })).s === 409, 'dos cuentas abiertas con el mismo nombre → 409');
+ok((await caja('POST', `/api/cuentas/${cu.d.id}/items`, { items: [{ productoId: masaje.id, cantidad: 2 }] })).d.total === 3 * M, 'otro vendedor carga consumos a la misma cuenta');
+ok((await otro('POST', `/api/cuentas/${cu.d.id}/items`, { items: [{ productoId: np.id, cantidad: 1 }] })).s === 409, 'cargar sin stock → 409');
+const cuCorr = await otro('PUT', `/api/cuentas/${cu.d.id}/items/${masaje.id}`, { cantidad: 2 });
+ok(cuCorr.s === 200 && cuCorr.d.total === 2 * M && cuCorr.d.items.length === 1, 'corregir la cantidad de un consumo');
+ok((await caja('GET', '/api/cuentas')).d.some((c) => c.id === cu.d.id), 'la cuenta aparece entre las abiertas');
+ok((await caja('POST', `/api/cuentas/${cu.d.id}/cancelar`)).s === 403, 'vendedor no cancela una cuenta con consumos → 403');
+ok((await admin('POST', `/api/cuentas/${cu.d.id}/cobrar`, { metodoPago: 'EFECTIVO' })).s === 409, 'cobrar sin caja abierta → 409');
+ok((await otro('POST', `/api/cuentas/${cu.d.id}/cobrar`, { pagos: [{ metodo: 'EFECTIVO', monto: 1 }] })).s === 400, 'cobrar con pagos incompletos → 400');
+ok((await otro('GET', `/api/cuentas/${cu.d.id}`)).d.estado === 'ABIERTA', 'tras un cobro fallido la cuenta sigue abierta');
+const cobros = await Promise.all([1, 2].map(() => otro('POST', `/api/cuentas/${cu.d.id}/cobrar`, { metodoPago: 'TARJETA' })));
+const cobro = cobros.find((r) => r.s === 201);
+ok(cobro && cobros.filter((r) => r.s === 409).length === 1, 'dos cobros simultáneos de la misma cuenta → solo uno', `(${cobros.map((r) => r.s)})`);
+ok(cobro.d.referencia === nc && cobro.d.total === 2 * M && cobro.d.items[0].cantidad === 2 && cobro.d.metodoPago === 'TARJETA', 'la venta lleva el nombre de la cuenta y sus consumos');
+const cuFin = (await otro('GET', `/api/cuentas/${cu.d.id}`)).d;
+ok(cuFin.estado === 'COBRADA' && cuFin.ventaId === cobro.d.id && !(await otro('GET', '/api/cuentas')).d.some((c) => c.id === cu.d.id), 'cuenta cobrada: ligada a la venta y fuera de las abiertas');
+ok((await otro('POST', `/api/cuentas/${cu.d.id}/items`, { items: [{ productoId: masaje.id, cantidad: 1 }] })).s === 409, 'cargar a una cuenta cobrada → 409');
+const vacia = (await caja('POST', '/api/cuentas', { nombre: nc })).d;
+ok((await caja('POST', `/api/cuentas/${vacia.id}/cobrar`, { metodoPago: 'EFECTIVO' })).s === 400, 'cobrar una cuenta vacía → 400');
+ok((await caja('POST', `/api/cuentas/${vacia.id}/cancelar`)).s === 200 && (await caja('GET', `/api/cuentas/${vacia.id}`)).d.estado === 'CANCELADA', 'el vendedor cancela una cuenta vacía');
+
 // Limpieza: cajas cerradas, producto y usuario de prueba inactivos.
 for (const c of [caja, otro]) { const a = await actual(c); if (a) await c('POST', `/api/caja/${a.id}/cerrar`, { efectivoContado: 0 }); }
 await admin('PUT', `/api/productos/${np.id}`, { nombre: np.nombre, categoria: np.categoria, precio: 20000, activo: false, seVende: true, controlaStock: true });

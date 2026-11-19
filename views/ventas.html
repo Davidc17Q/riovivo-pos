@@ -16,6 +16,7 @@
     <span class="marca"><img src="/static/img/loto.svg" alt=""> RioVivo Spa <small>Ventas</small></span>
     <nav class="pestanas" role="tablist">
       <button role="tab" data-vista="nueva">Nueva venta</button>
+      <button role="tab" data-vista="cuentas">Cuentas <span class="contador" id="n-cuentas" hidden></span></button>
       <button role="tab" data-vista="hoy">Ventas del día</button>
       <button role="tab" data-vista="caja">Caja</button>
     </nav>
@@ -39,8 +40,13 @@
       </div>
 
       <aside class="panel carrito" aria-label="Venta en curso">
+        <div class="modo-cuenta" id="modo-cuenta" hidden>
+          <span>Cuenta abierta</span>
+          <b id="nombre-cuenta"></b>
+          <button type="button" class="texto-btn" id="salir-cuenta">Volver a venta rápida</button>
+        </div>
         <div class="cabecera" style="margin-bottom:4px">
-          <h2>Venta en curso</h2>
+          <h2 id="titulo-venta">Venta en curso</h2>
           <button type="button" class="texto-btn" id="vaciar" hidden>Vaciar</button>
         </div>
         <label class="referencia">
@@ -89,7 +95,18 @@
           <p class="vuelto" id="vuelto" aria-live="polite"></p>
         </div>
         <button class="btn primario grande" id="cobrar">Registrar venta</button>
+        <button type="button" class="btn a-cuenta" id="a-cuenta" hidden>Cargar a una cuenta</button>
+        <button type="button" class="texto-btn cancelar-cuenta" id="cancelar-cuenta" hidden>Cancelar esta cuenta</button>
       </aside>
+    </section>
+
+    <section id="vista-cuentas" hidden>
+      <div class="cabecera">
+        <h2>Cuentas abiertas</h2>
+        <button type="button" class="btn primario mini fijo" id="nueva-cuenta">Nueva cuenta</button>
+      </div>
+      <p class="tenue" style="margin-top:0">Cabañas, mesas o clientes que pagan al final. Toca una cuenta para cargarle consumos o cobrarla.</p>
+      <div class="cuentas" id="lista-cuentas"></div>
     </section>
 
     <section id="vista-hoy" hidden>
@@ -178,6 +195,21 @@
       <button class="btn" id="imprimir">Imprimir</button>
       <button class="btn primario" id="cerrar-ticket">Listo</button>
     </div>
+  </dialog>
+
+  <dialog id="dlg-cuenta">
+    <form id="form-cuenta">
+      <h2 id="titulo-dlg-cuenta">Cargar a una cuenta</h2>
+      <div class="elegir-cuenta" id="elegir-cuenta" role="group" aria-label="Cuentas abiertas"></div>
+      <label><span id="lbl-nombre-cuenta">O abre una cuenta nueva</span>
+        <input type="text" id="nombre-nueva-cuenta" maxlength="60" placeholder="Ej. Cabaña 3, Mesa 5, Laura Gómez" autocomplete="off">
+      </label>
+      <p class="error" id="error-cuenta" role="alert" hidden></p>
+      <div class="botones">
+        <button type="button" class="btn" id="cancelar-dlg-cuenta">Cancelar</button>
+        <button class="btn primario" id="ok-cuenta">Cargar</button>
+      </div>
+    </form>
   </dialog>
 
   <dialog id="dlg-anular">
