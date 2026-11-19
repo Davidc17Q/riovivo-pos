@@ -127,7 +127,7 @@ input[type=search] { min-height: 48px; border-color: transparent; border-radius:
 .carrito > .cabecera { padding: 16px 20px 2px; }
 .carrito h2 { font-size: 1.2rem; }
 #lineas { padding: 0 20px; }
-.carrito > .fila { padding: 0 20px; }
+.cuerpo-venta > .fila { padding: 0 20px; }
 .linea { padding: 8px 0; border-bottom-style: dashed; }
 .linea b { font-weight: 500; }
 .linea .cant button { border-radius: 50%; }
@@ -142,15 +142,19 @@ input[type=search] { min-height: 48px; border-color: transparent; border-radius:
   color: var(--tinta); font-size: 1rem; font-weight: 600;
 }
 .carrito .totales .total .num { font-family: var(--marca); font-size: 2.1rem; font-weight: 700; letter-spacing: -.02em; color: var(--tinta); }
-.carrito > label, .carrito > .segmento, .carrito > #cobrar { margin-left: 20px; margin-right: 20px; width: auto; }
-.carrito > label { margin-top: 12px; }
+.cuerpo-venta > .segmento { margin-left: 20px; margin-right: 20px; width: auto; }
+/* Panel de venta: encabezado y pie fijos; lo del medio se desplaza si no cabe. */
+.carrito > .cuerpo-venta { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+#lineas { flex: none; min-height: 0; overflow: visible; }
+.pie-venta { display: grid; gap: 6px; padding: 12px 20px 16px; border-top: 1px solid var(--borde); background: #fff; }
+.pie-venta .cancelar-cuenta { justify-self: center; }
 .segmento button {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
   min-height: 54px; border-radius: 12px; font-size: .82rem;
 }
 .segmento svg { width: 20px; height: 20px; }
 .segmento button[aria-pressed=true] { background: var(--verde-claro); border-color: var(--verde); color: var(--verde); box-shadow: inset 0 0 0 1px var(--verde); }
-#cobrar { margin-bottom: 18px; min-height: 56px; border-radius: 14px; font-size: 1.1rem; letter-spacing: .01em; }
+#cobrar { margin: 0; width: 100%; min-height: 56px; border-radius: 14px; font-size: 1.1rem; letter-spacing: .01em; }
 #cobrar:not(:disabled) { background: linear-gradient(135deg, #1aa0ae, var(--verde) 70%); box-shadow: 0 6px 18px rgba(18, 122, 134, .30); }
 #cobrar:disabled { opacity: 1; background: #ece6dd; border-color: #ece6dd; color: var(--tenue); }
 
@@ -196,7 +200,7 @@ input[type=search] { min-height: 48px; border-color: transparent; border-radius:
 
 /* ---------- Cobro: referencia, pago dividido y vuelto ---------- */
 .oculto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.carrito .referencia { position: relative; display: block; margin: 2px 0 6px; }
+.carrito .referencia { position: relative; display: block; margin: 4px 20px 8px; }
 .carrito .referencia svg { position: absolute; left: 11px; top: 50%; width: 16px; height: 16px; transform: translateY(-50%); color: var(--tenue); pointer-events: none; }
 .carrito .referencia input { margin: 0; min-height: 40px; padding-left: 34px; background: #faf6f1; border-color: transparent; font-size: .9rem; }
 .carrito .referencia input:not(:placeholder-shown) { background: var(--verde-claro); color: var(--verde); font-weight: 600; }
@@ -234,12 +238,6 @@ input[type=search] { min-height: 48px; border-color: transparent; border-radius:
 .cambio-celebra { margin: 10px 0 0; padding: 10px 16px; border-radius: 12px; background: var(--exito-claro); color: #1f7a50; font-weight: 600; }
 .cambio-celebra b { display: block; font-family: var(--marca); font-size: 1.6rem; color: var(--exito); }
 
-/* Con pago dividido el panel crece: se desplaza por dentro y el botón de cobrar queda siempre a la vista. */
-@media (min-width: 901px) {
-  .carrito { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
-  #cobrar { position: sticky; bottom: 14px; z-index: 2; margin-bottom: 14px; box-shadow: 0 0 0 20px #fff; }
-  #cobrar:not(:disabled) { box-shadow: 0 6px 18px rgba(18, 122, 134, .30), 0 0 0 20px #fff; }
-}
 
 /* ---------- Ventas del día: búsqueda, filtros, píldoras y acciones ---------- */
 .filtros-ventas { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 18px 0 12px; }
@@ -286,9 +284,8 @@ tr.anulada .pago-pill { text-decoration: none; }
 .modo-cuenta b { grid-column: 1; font-family: var(--marca); font-size: 1.25rem; line-height: 1.2; overflow-wrap: anywhere; }
 .modo-cuenta .texto-btn { grid-column: 2; grid-row: 1 / span 2; color: #fff; text-decoration: none; border: 1px solid rgba(255, 255, 255, .5); border-radius: 10px; padding: 0 10px; }
 .modo-cuenta .texto-btn:hover { color: #fff; background: rgba(255, 255, 255, .14); }
-.carrito > .a-cuenta { margin: -6px 20px 18px; width: auto; min-height: 46px; border-radius: 12px; border-color: var(--verde); color: var(--verde); background: #fff; font-weight: 600; }
-.carrito > .a-cuenta:hover { background: var(--verde-claro); }
-.carrito > .cancelar-cuenta { margin: -8px auto 14px; }
+.pie-venta .a-cuenta { width: 100%; min-height: 46px; border-radius: 12px; border-color: var(--verde); color: var(--verde); background: #fff; font-weight: 600; }
+.pie-venta .a-cuenta:hover { background: var(--verde-claro); }
 
 .cuentas { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
 .cuenta {
@@ -329,6 +326,7 @@ tr.anulada .pago-pill { text-decoration: none; }
   .chips::-webkit-scrollbar { display: none; }
   .chips button { flex: none; }
   .venta > div { min-width: 0; }
+  .carrito > .cuerpo-venta { overflow: visible; }
 }
 @media print {
   .no-imprimir { display: none !important; }

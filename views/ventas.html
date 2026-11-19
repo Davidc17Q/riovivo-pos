@@ -49,10 +49,12 @@
           <h2 id="titulo-venta">Venta en curso</h2>
           <button type="button" class="texto-btn" id="vaciar" hidden>Vaciar</button>
         </div>
+        <!-- Cuerpo desplazable: el pie con el botón de cobrar queda siempre a la vista. -->
+        <div class="cuerpo-venta">
         <label class="referencia">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12 12 20l-8-8V4h8Z"/><circle cx="8.5" cy="8.5" r="1.5"/></svg>
           <span class="oculto">Cliente, mesa, cabaña o habitación</span>
-          <input type="text" id="referencia" maxlength="60" placeholder="Cliente, mesa, cabaña o habitación (opcional)" autocomplete="off">
+          <input type="text" id="referencia" maxlength="60" placeholder="Cliente, mesa o cabaña (opcional)" autocomplete="off">
         </label>
         <div id="lineas"></div>
         <div class="fila" style="margin-top:14px">
@@ -94,9 +96,12 @@
           <div class="billetes" id="billetes" aria-label="Valores rápidos"></div>
           <p class="vuelto" id="vuelto" aria-live="polite"></p>
         </div>
-        <button class="btn primario grande" id="cobrar">Registrar venta</button>
-        <button type="button" class="btn a-cuenta" id="a-cuenta" hidden>Cargar a una cuenta</button>
-        <button type="button" class="texto-btn cancelar-cuenta" id="cancelar-cuenta" hidden>Cancelar esta cuenta</button>
+        </div>
+        <div class="pie-venta">
+          <button class="btn primario grande" id="cobrar">Registrar venta</button>
+          <button type="button" class="btn a-cuenta" id="a-cuenta" hidden>Cargar a una cuenta</button>
+          <button type="button" class="texto-btn cancelar-cuenta" id="cancelar-cuenta" hidden>Cancelar esta cuenta</button>
+        </div>
       </aside>
     </section>
 
