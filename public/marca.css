@@ -309,6 +309,32 @@ tr.anulada .pago-pill { text-decoration: none; }
 .elegir-cuenta button[aria-pressed=true] { border-color: var(--verde); background: var(--verde-claro); color: var(--verde); box-shadow: inset 0 0 0 1px var(--verde); }
 .elegir-cuenta .tenue { font-variant-numeric: tabular-nums; font-weight: 500; }
 
+/* Encabezado: cambio de área y usuario conectado. */
+.barra .der { gap: 14px; }
+.barra a.cambiar-area {
+  display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 0 12px;
+  border: 1px solid var(--borde); border-radius: 10px; background: #fff; text-decoration: none; font-size: .86rem;
+  transition: background-color .12s, border-color .12s;
+}
+.barra a.cambiar-area:hover { text-decoration: none; border-color: var(--agua); background: var(--verde-claro); }
+.barra a.cambiar-area svg { width: 16px; height: 16px; }
+.usuario { display: inline-flex; align-items: center; gap: 9px; padding-left: 14px; border-left: 1px solid var(--borde); }
+.usuario .avatar {
+  display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 50%;
+  background: var(--verde-claro); color: var(--verde); font-family: var(--marca); font-weight: 700; font-size: .82rem; letter-spacing: .02em;
+}
+.usuario .quien { display: grid; line-height: 1.2; }
+.usuario .quien b { font-weight: 600; color: var(--tinta); font-size: .88rem; }
+.usuario .quien small { color: var(--tenue); font-size: .74rem; }
+.barra .salir { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 8px; border-radius: 10px; text-decoration: none; }
+.barra .salir:hover { text-decoration: none; background: var(--verde-claro); }
+.barra .salir svg { width: 16px; height: 16px; }
+@media (max-width: 900px) {
+  .usuario { padding-left: 10px; }
+  .usuario .quien, .barra .salir span, .barra a.cambiar-area span { display: none; }
+  .barra a.cambiar-area { padding: 0 9px; }
+}
+
 /* Login */
 .login .panel { padding: 28px; border-radius: 20px; }
 .login .logo { display: block; width: 150px; margin: 0 auto 4px; }

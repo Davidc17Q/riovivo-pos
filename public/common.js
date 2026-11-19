@@ -159,7 +159,12 @@ function iniciarPestanas(alAbrir) {
 /** Encabezado: nombre del usuario y botón de salir. Devuelve el usuario en sesión. */
 async function iniciarSesionUi() {
   const yo = await api('GET', '/api/me');
+  // Quién está conectado: iniciales, nombre y rol (el nombre puede coincidir con un área, p. ej. "Administración").
+  const iniciales = yo.nombre.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
   $('#yo').textContent = yo.nombre;
+  $('#yo-rol').textContent = yo.rol === 'ADMIN' ? 'Administrador' : 'Vendedor';
+  $('#yo-iniciales').textContent = iniciales || '?';
+  $('.usuario').title = `${yo.nombre} · ${$('#yo-rol').textContent}`;
   $('#salir').onclick = async () => {
     await api('POST', '/api/logout');
     location.href = '/login';
