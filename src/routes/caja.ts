@@ -66,6 +66,22 @@ async function conCuadre<T extends SesionCaja>(db: Db, caja: T) {
   };
 }
 
+type ConCuadre = Awaited<ReturnType<typeof conCuadre>>;
+
+/**
+ * Cierre ciego: el vendedor no ve cuánto debería haber en el cajón ni, después, la diferencia.
+ * Cuenta y declara; el cuadre completo solo lo ve un administrador.
+ */
+function ciego(c: ConCuadre) {
+  const { ventasEfectivo, ventasTarjeta, ventasTransferencia, efectivoEsperado, diferencia, cuadre, ...resto } = c;
+  void ventasEfectivo; void ventasTarjeta; void ventasTransferencia; void efectivoEsperado; void diferencia;
+  return {
+    ...resto,
+    cuadre: { ciego: true, base: cuadre.base, efectivoContado: cuadre.efectivoContado, ventas: cuadre.ventas, anuladas: cuadre.anuladas },
+  };
+}
+const segun = (rol: string) => (c: ConCuadre) => (rol === 'ADMIN' ? c : ciego(c));
+
 export async function rutasCaja(app: FastifyInstance) {
   // Caja abierta de quien pregunta (o null).
   app.get('/api/caja/actual', async (req) => {
@@ -73,7 +89,7 @@ export async function rutasCaja(app: FastifyInstance) {
       where: { usuarioId: req.usuario!.id, estado: 'ABIERTA' },
       include: conNombres,
     });
-    return { caja: caja ? await conCuadre(prisma, caja) : null };
+    return { caja: caja ? segun(req.usuario!.rol)(await conCuadre(prisma, caja)) : null };
   });
 
   app.post('/api/caja/abrir', async (req, reply) => {
@@ -87,7 +103,7 @@ export async function rutasCaja(app: FastifyInstance) {
       }
       return tx.sesionCaja.create({ data: { usuarioId, baseInicial }, include: conNombres });
     });
-    return reply.code(201).send(await conCuadre(prisma, caja));
+    return reply.code(201).send(segun(req.usuario!.rol)(await conCuadre(prisma, caja)));
   });
 
   // Cierre con arqueo: el vendedor solo cierra la suya; el admin, cualquiera.
@@ -126,7 +142,7 @@ export async function rutasCaja(app: FastifyInstance) {
         include: conNombres,
       });
     });
-    return conCuadre(prisma, cerrada);
+    return segun(yo.rol)(await conCuadre(prisma, cerrada));
   });
 
   // Cajas recientes: el vendedor ve las suyas; el admin, todas.
@@ -138,6 +154,6 @@ export async function rutasCaja(app: FastifyInstance) {
       take: 30,
       include: conNombres,
     });
-    return Promise.all(cajas.map((c) => conCuadre(prisma, c)));
+    return (await Promise.all(cajas.map((c) => conCuadre(prisma, c)))).map(segun(yo.rol));
   });
 }

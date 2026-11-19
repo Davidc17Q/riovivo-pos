@@ -101,11 +101,11 @@
         </div>
       </div>
       <div class="kpis">
-        <div class="kpi"><span>Total vendido</span><b id="hoy-total"></b></div>
+        <div class="kpi solo-admin"><span>Total vendido</span><b id="hoy-total"></b></div>
         <div class="kpi"><span>Ventas</span><b id="hoy-cantidad"></b></div>
-        <div class="kpi"><span>Efectivo</span><b id="hoy-EFECTIVO"></b></div>
-        <div class="kpi"><span>Tarjeta</span><b id="hoy-TARJETA"></b></div>
-        <div class="kpi"><span>Transferencia</span><b id="hoy-TRANSFERENCIA"></b></div>
+        <div class="kpi solo-admin"><span>Efectivo</span><b id="hoy-EFECTIVO"></b></div>
+        <div class="kpi solo-admin"><span>Tarjeta</span><b id="hoy-TARJETA"></b></div>
+        <div class="kpi solo-admin"><span>Transferencia</span><b id="hoy-TRANSFERENCIA"></b></div>
       </div>
       <div class="filtros-ventas">
         <input type="search" id="buscar-ventas" placeholder="Buscar por N.º, cliente, producto o vendedor" aria-label="Buscar ventas">
@@ -138,13 +138,15 @@
         </div>
         <div class="kpis">
           <div class="kpi"><span>Base inicial</span><b id="caja-base"></b></div>
-          <div class="kpi"><span>Ventas en efectivo</span><b id="caja-efectivo"></b></div>
-          <div class="kpi"><span>Efectivo esperado en el cajón</span><b id="caja-esperado"></b></div>
-          <div class="kpi"><span>Tarjeta</span><b id="caja-tarjeta"></b></div>
-          <div class="kpi"><span>Transferencia</span><b id="caja-transferencia"></b></div>
+          <div class="kpi"><span>Ventas registradas</span><b id="caja-ventas"></b></div>
+          <div class="kpi solo-admin"><span>Ventas en efectivo</span><b id="caja-efectivo"></b></div>
+          <div class="kpi solo-admin"><span>Efectivo esperado en el cajón</span><b id="caja-esperado"></b></div>
+          <div class="kpi solo-admin"><span>Tarjeta</span><b id="caja-tarjeta"></b></div>
+          <div class="kpi solo-admin"><span>Transferencia</span><b id="caja-transferencia"></b></div>
         </div>
         <form class="panel apilado angosto" id="form-cerrar">
           <h3>Cerrar caja</h3>
+          <p class="tenue chico ciego-nota" hidden>Cierre ciego: cuenta todo el efectivo del cajón, incluida la base, y escribe el valor. El sistema no muestra cuánto debería haber; el cuadre lo revisa el administrador.</p>
           <label>Efectivo contado en el cajón (pesos)
             <input type="number" id="contado" min="0" step="1" inputmode="numeric" required>
           </label>

@@ -135,6 +135,8 @@ export async function rutasVentas(app: FastifyInstance) {
     });
     // Las anuladas se listan, pero no suman.
     const total = ventas.reduce((s, v) => s + (v.estado === 'ACTIVA' ? v.total : 0), 0);
+    // Cierre ciego: el vendedor no ve totales en dinero; el listado sí (para reimprimir y consultar).
+    if (req.usuario!.rol !== 'ADMIN') return { fecha: dia, ciego: true, ventas };
     return { fecha: dia, total, ventas };
   });
 

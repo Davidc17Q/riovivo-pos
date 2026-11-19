@@ -262,11 +262,16 @@ async function cargarVistaCaja() {
     const q = caja.cuadre;
     $('#titulo-caja').textContent = `Caja N.º ${caja.id} · abierta ${fechaHora(caja.abiertaEn)}`;
     $('#caja-base').textContent = cop(q.base);
-    $('#caja-efectivo').textContent = cop(q.efectivo);
-    $('#caja-esperado').textContent = cop(q.efectivoEsperado);
-    $('#caja-tarjeta').textContent = cop(q.tarjeta);
-    $('#caja-transferencia').textContent = cop(q.transferencia);
-    pintarDiferencia();
+    $('#caja-ventas').textContent = q.ventas;
+    $('.ciego-nota').hidden = !q.ciego;
+    $('#diferencia-viva').hidden = Boolean(q.ciego);
+    if (!q.ciego) {
+      $('#caja-efectivo').textContent = cop(q.efectivo);
+      $('#caja-esperado').textContent = cop(q.efectivoEsperado);
+      $('#caja-tarjeta').textContent = cop(q.tarjeta);
+      $('#caja-transferencia').textContent = cop(q.transferencia);
+      pintarDiferencia();
+    }
   }
   $('#titulo-cajas').textContent = yo.rol === 'ADMIN' ? 'Cajas recientes (todas)' : 'Mis cajas';
   $('#tabla-cajas').innerHTML = filasCajas(cajas);
@@ -275,6 +280,7 @@ async function cargarVistaCaja() {
 function pintarDiferencia() {
   const el = $('#diferencia-viva');
   const valor = $('#contado').value;
+  if (caja?.cuadre.ciego) return;
   el.className = 'tenue';
   if (valor === '' || !caja) return (el.textContent = 'Escribe lo que contaste para ver la diferencia.');
   const dif = Number(valor) - caja.cuadre.efectivoEsperado;
@@ -381,7 +387,7 @@ async function cargarHoy() {
   // Las anuladas se muestran, pero no cuentan en ningún total.
   const activas = d.ventas.filter((v) => v.estado === 'ACTIVA');
   $('#titulo-hoy').textContent = `Ventas del día · ${diaLargo(d.fecha)}`;
-  $('#hoy-total').textContent = cop(d.total);
+  if (!d.ciego) $('#hoy-total').textContent = cop(d.total);
   $('#hoy-cantidad').textContent = activas.length;
   // Total por método: es lo que se cuadra contra el cajón, el datáfono y el banco.
   for (const m of BASICOS) {
@@ -520,6 +526,8 @@ $('#cerrar-ticket').onclick = () => $('#dlg-ticket').close();
 
 (async () => {
   yo = await iniciarSesionUi();
+  // Cierre ciego: el vendedor no ve totales en dinero de la caja ni del día.
+  document.body.classList.toggle('vendedor', yo.rol !== 'ADMIN');
   await cargarCaja();
   $('#ir-admin').hidden = yo.rol !== 'ADMIN';
   iniciarPestanas((vista) => {

@@ -27,6 +27,7 @@ await otro('POST', '/api/login', { usuario: nu, clave: 'clave-e2e-123' });
 const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date());
 const reporte = async () => (await admin('GET', `/api/reportes?desde=${hoy}&hasta=${hoy}`)).d;
 const actual = async (c) => (await c('GET', '/api/caja/actual')).d.caja;
+const deAdmin = async (id) => (await admin('GET', '/api/cajas')).d.find((c) => c.id === id);
 const stockDe = async (id) => (await admin('GET', '/api/productos?todos=1')).d.find((p) => p.id === id).stock;
 const vender = (c, items, metodoPago, descuento = 0) => c('POST', '/api/ventas', { items, descuento, metodoPago });
 
@@ -45,7 +46,8 @@ ok(await stockDe(np.id) === 10, 'la venta bloqueada no tocó el stock');
 ok((await caja('POST', '/api/caja/abrir', { baseInicial: -1 })).s === 400, 'base negativa → 400');
 ok((await caja('POST', '/api/caja/abrir', { baseInicial: 1000.5 })).s === 400, 'base decimal → 400');
 const ab = await caja('POST', '/api/caja/abrir', { baseInicial: 100000 });
-ok(ab.s === 201 && ab.d.estado === 'ABIERTA' && ab.d.cuadre.efectivoEsperado === 100000, 'abrir caja con base 100.000');
+ok(ab.s === 201 && ab.d.estado === 'ABIERTA' && ab.d.cuadre.base === 100000, 'abrir caja con base 100.000');
+ok(ab.d.cuadre.ciego === true && ab.d.cuadre.efectivoEsperado === undefined && ab.d.cuadre.efectivo === undefined, 'cierre ciego: el vendedor no recibe el efectivo esperado');
 ok((await caja('POST', '/api/caja/abrir', { baseInicial: 5 })).s === 409, 'segunda caja del mismo usuario → 409');
 const dobles = await Promise.all([otro('POST', '/api/caja/abrir', { baseInicial: 0 }), otro('POST', '/api/caja/abrir', { baseInicial: 0 })]);
 ok(dobles.filter((r) => r.s === 201).length === 1 && dobles.filter((r) => r.s === 409).length === 1, 'dos aperturas simultáneas → solo una caja', `(${dobles.map((r) => r.s)})`);
@@ -63,7 +65,7 @@ const v3 = await vender(caja, [{ productoId: np.id, cantidad: 1 }], 'TRANSFERENC
 const v4 = await vender(caja, [{ productoId: np.id, cantidad: 1 }], 'EFECTIVO', 5000);       // 15.000
 const M = masaje.precio;
 ok([v1, v2, v3, v4].every((v) => v.s === 201 && v.d.cajaId === cid && v.d.estado === 'ACTIVA'), '4 ventas ligadas a la caja abierta');
-let q = (await actual(caja)).cuadre;
+let q = (await deAdmin(cid)).cuadre;
 ok(q.efectivo === 55000 && q.tarjeta === M && q.transferencia === 20000 && q.efectivoEsperado === 155000 && q.ventas === 4, 'cuadre en vivo separado por método');
 ok(await stockDe(np.id) === 6, 'stock 10 → 6');
 
@@ -79,7 +81,7 @@ const dobleAn = await Promise.all([1, 2].map(() => admin('POST', `/api/ventas/${
 ok(dobleAn.filter((r) => r.s === 200).length === 1 && await stockDe(np.id) === 9, 'dos anulaciones simultáneas → una sola, stock repuesto una vez', `(${dobleAn.map((r) => r.s)})`);
 const movs = (await admin('GET', '/api/inventario/movimientos')).d.filter((m) => m.productoId === np.id);
 ok(movs.filter((m) => m.tipo === 'ANULACION').length === 2 && movs[0].stockResultante === 9, 'movimientos inversos de inventario registrados');
-q = (await actual(caja)).cuadre;
+q = (await deAdmin(cid)).cuadre;
 ok(q.efectivo === 15000 && q.transferencia === 0 && q.tarjeta === M && q.efectivoEsperado === 115000 && q.ventas === 2 && q.anuladas === 2 && q.totalAnulado === 60000, 'anuladas salen del cuadre de caja');
 ok((await caja('GET', '/api/ventas')).d.ventas.some((v) => v.id === v1.d.id && v.estado === 'ANULADA'), 'sigue visible como anulada en ventas del día');
 
@@ -111,7 +113,13 @@ ok((await otro('GET', '/api/cajas')).d.every((c) => c.usuarioId === uOtro.id), '
 ok((await admin('GET', '/api/cajas')).d.some((c) => c.id === cid), 'admin ve las cajas de todos');
 ok((await caja('POST', `/api/caja/${cid}/cerrar`, { efectivoContado: -5 })).s === 400, 'conteo negativo → 400');
 ok((await caja('POST', `/api/caja/${cid}/cerrar`, {})).s === 400, 'cerrar sin conteo → 400');
-const ci = await caja('POST', `/api/caja/${cid}/cerrar`, { efectivoContado: 110000, nota: 'Faltó un billete' });
+const vHoy = (await caja('GET', '/api/ventas')).d;
+ok(vHoy.ciego === true && vHoy.total === undefined && vHoy.ventas.length > 0, 'cierre ciego: el vendedor no recibe el total del día');
+ok(typeof (await admin('GET', '/api/ventas')).d.total === 'number', 'el admin sí recibe el total del día');
+const ciV = await caja('POST', `/api/caja/${cid}/cerrar`, { efectivoContado: 110000, nota: 'Faltó un billete' });
+ok(ciV.s === 200 && ciV.d.estado === 'CERRADA' && ciV.d.diferencia === undefined && ciV.d.efectivoEsperado === undefined && ciV.d.cuadre.efectivoContado === 110000,
+  'cierre ciego: al cerrar el vendedor solo ve lo que declaró');
+const ci = { s: ciV.s, d: await deAdmin(cid) };
 ok(ci.s === 200 && ci.d.estado === 'CERRADA' && ci.d.efectivoEsperado === 115000 && ci.d.efectivoContado === 110000 && ci.d.diferencia === -5000
   && ci.d.ventasEfectivo === 15000 && ci.d.ventasTarjeta === M && ci.d.ventasTransferencia === 0 && ci.d.cerradaPor.nombre, 'cierre guardado: esperado 115.000, contado 110.000, faltante 5.000');
 ok((await caja('POST', `/api/caja/${cid}/cerrar`, { efectivoContado: 1 })).s === 409, 'cerrar dos veces → 409');
@@ -132,7 +140,7 @@ const rafaga = await Promise.all([
 ]);
 const pasaron = rafaga.filter((r) => r.s === 201).length;
 const enCaja = (await caja('GET', '/api/ventas')).d.ventas.filter((v) => v.cajaId === c2.id && v.estado === 'ACTIVA');
-ok(rafaga[4].s === 200 && rafaga[4].d.ventasEfectivo === suma(enCaja) && enCaja.length === pasaron,
+ok(rafaga[4].s === 200 && (await deAdmin(c2.id)).ventasEfectivo === suma(enCaja) && enCaja.length === pasaron,
   'cierre contra ventas simultáneas: el cuadre incluye exactamente las que entraron', `(${pasaron} ventas; estados ${rafaga.map((r) => r.s)})`);
 ok(rafaga.every((r) => [200, 201, 409].includes(r.s)), 'las que no entraron fueron rechazadas, sin errores 500');
 const s = await stockDe(np.id);
@@ -154,7 +162,7 @@ ok(vm.s === 201 && vm.d.metodoPago === 'MIXTO' && vm.d.pagos.length === 2 && vm.
   'venta mixta con vuelto y referencia', JSON.stringify({ s: vm.s, m: vm.d?.metodoPago, c: vm.d?.cambio }));
 const ve = await otro('POST', '/api/ventas', { items: unMasaje, metodoPago: 'EFECTIVO', recibido: M + 7000 });
 ok(ve.s === 201 && ve.d.cambio === 7000 && ve.d.pagos.length === 1, 'efectivo simple con vuelto');
-const qo = (await actual(otro)).cuadre;
+const qo = (await deAdmin((await actual(otro)).id)).cuadre;
 ok(qo.efectivo === 1000 + M && qo.tarjeta === M - 1000 && qo.efectivoEsperado === 1000 + M, 'la caja reparte la venta mixta por método (el vuelto no suma)', JSON.stringify(qo));
 const repM = await reporte();
 ok(suma(repM.porMetodo) === repM.total, 'reporte por método cuadra con ventas mixtas');

@@ -83,6 +83,18 @@ function textoDiferencia(dif) {
 function htmlCuadre(c) {
   const q = c.cuadre;
   const cerrada = c.estado === 'CERRADA';
+  // Cierre ciego (vendedor): solo lo que declaró; el cuadre completo lo ve el administrador.
+  if (q.ciego) return `
+    <h3>Caja N.º ${c.id}</h3>
+    <p class="centro tenue chico">${esc(c.usuario.nombre)}<br>Abierta: ${esc(fechaHora(c.abiertaEn))}<br>
+      ${cerrada ? `Cerrada: ${esc(fechaHora(c.cerradaEn))} por ${esc(c.cerradaPor?.nombre)}` : 'Aún abierta'}</p>
+    <div class="totales">
+      <div><span>Base inicial</span><span>${cop(q.base)}</span></div>
+      <div><span>Ventas registradas</span><span>${q.ventas}</span></div>
+      ${cerrada ? `<div class="total"><span>Efectivo declarado</span><span>${cop(q.efectivoContado)}</span></div>` : ''}
+    </div>
+    <p class="tenue chico">${cerrada ? 'Cierre ciego entregado. El administrador revisa el cuadre.' : 'Cierre ciego: al cerrar solo declaras lo que contaste.'}</p>
+    ${c.nota ? `<p class="tenue chico">Nota: ${esc(c.nota)}</p>` : ''}`;
   return `
     <h3>Cuadre de caja N.º ${c.id}</h3>
     <p class="centro tenue chico">${esc(c.usuario.nombre)}<br>Abierta: ${esc(fechaHora(c.abiertaEn))}<br>
@@ -114,9 +126,9 @@ function filasCajas(cajas, conCerrar = false) {
       <td>${c.id}</td><td>${esc(c.usuario.nombre)}</td>
       <td class="chico">${esc(fechaHora(c.abiertaEn))}</td>
       <td class="chico">${cerrada ? esc(fechaHora(c.cerradaEn)) : '<span class="etiqueta">Abierta</span>'}</td>
-      <td class="num">${cop(q.efectivoEsperado)}</td>
+      <td class="num">${q.ciego ? '—' : cop(q.efectivoEsperado)}</td>
       <td class="num">${cerrada ? cop(q.efectivoContado) : '—'}</td>
-      <td class="num">${cerrada
+      <td class="num">${cerrada && q.ciego ? '<span class="etiqueta gris">Entregada</span>' : cerrada
         ? `<span class="etiqueta ${q.diferencia < 0 ? 'rojo' : q.diferencia > 0 ? 'gris' : ''}">${textoDiferencia(q.diferencia)}</span>`
         : conCerrar ? `<button class="btn mini" data-cerrar-caja="${c.id}">Cerrar</button>` : '—'}</td></tr>`;
   }).join('');
