@@ -243,7 +243,7 @@ input[type=search] { min-height: 48px; border-color: transparent; border-radius:
 .filtros-ventas { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 18px 0 12px; }
 .filtros-ventas input[type=search] { flex: 1 1 280px; max-width: 420px; margin: 0; }
 .filtros-ventas .chips { margin: 0; }
-.chips .cuenta { margin-left: 4px; font-weight: 500; opacity: .7; font-variant-numeric: tabular-nums; }
+.chips .n-filtro { margin-left: 4px; font-weight: 500; opacity: .7; font-variant-numeric: tabular-nums; }
 .chips.filtros button[aria-pressed=true] { background: var(--tinta); border-color: var(--tinta); color: #fff; }
 .pills { display: inline-flex; flex-wrap: wrap; gap: 4px; }
 .pago-pill { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: .76rem; font-weight: 600; line-height: 1.5; white-space: nowrap; }
@@ -330,4 +330,14 @@ tr.anulada .pago-pill { text-decoration: none; }
 }
 @media print {
   .no-imprimir { display: none !important; }
+  /* Solo el ticket. Sin la animación de entrada del diálogo: si se imprime justo al abrirlo,
+     el navegador tomaba el primer cuadro (transparente) y la hoja salía en blanco. */
+  @page { margin: 4mm; }
+  body { background: #fff !important; }
+  body > :not(#dlg-ticket) { display: none !important; }
+  #dlg-ticket {
+    position: static; inset: auto; width: 72mm; max-width: none; max-height: none; overflow: visible;
+    margin: 0; padding: 0; box-shadow: none; animation: none !important; opacity: 1 !important; transform: none !important;
+  }
+  #dlg-ticket::backdrop { background: none; }
 }

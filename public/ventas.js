@@ -500,7 +500,7 @@ function pintarHoy() {
   $('#filtro-ventas').innerHTML = Object.entries(FILTROS)
     .map(([k, f]) => [k, f, ventasHoy.filter(f.cumple).length])
     .filter(([k, , n]) => n > 0 || !['MIXTO', 'ANULADAS'].includes(k) || k === filtroVentas)
-    .map(([k, f, n]) => `<button type="button" data-filtro="${k}" aria-pressed="${k === filtroVentas}">${f.nombre} <span class="cuenta">${n}</span></button>`)
+    .map(([k, f, n]) => `<button type="button" data-filtro="${k}" aria-pressed="${k === filtroVentas}">${f.nombre} <span class="n-filtro">${n}</span></button>`)
     .join('');
   const q = $('#buscar-ventas').value.trim().toLowerCase();
   const lista = ventasHoy.filter((v) => FILTROS[filtroVentas].cumple(v) && (!q || [
