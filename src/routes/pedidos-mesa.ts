@@ -4,8 +4,9 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../db';
-import { ErrorHttp, entero, idDeUrl, objeto, texto } from '../util';
+import { ErrorHttp, ZONA, entero, idDeUrl, objeto, texto } from '../util';
 import { cargar, cuentaAbiertaONueva } from './cuentas';
+import { leerAjustes } from './ajustes';
 
 type Tx = Prisma.TransactionClient;
 
@@ -67,13 +68,47 @@ const cuentaDeMesa = (mesa: string) => (/^\d+$/.test(mesa) ? `Mesa ${mesa}` : me
 
 const conLineas = { lineas: { orderBy: { id: 'asc' } } } as const;
 
+// ---------- Domicilio ----------
+// Lo cobra el cliente: uno por restaurante del pedido (cada uno manda su domiciliario).
+// Catering: tarifa de catering; los demás, tarifa de día o de noche según la hora del pedido.
+const fmtHora = new Intl.DateTimeFormat('en-GB', { timeZone: ZONA, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+const esCatering = (restaurante: string, grupo: string) => /catering/.test(normal(`${restaurante} ${grupo}`));
+
+async function productosDomicilio(tx: Tx | typeof prisma) {
+  const todos = await tx.producto.findMany({ where: { activo: true, seVende: true, nombre: { startsWith: 'Domicilio', mode: 'insensitive' } } });
+  const buscar = (palabra: string) => todos.find((p) => normal(p.nombre).includes(palabra)) ?? null;
+  return { todos, catering: buscar('catering'), dia: buscar('dia'), noche: buscar('noche') };
+}
+
+function domiciliosDe(
+  pedido: { creadoEn: Date; lineas: { restaurante: string; grupo: string }[] },
+  dom: Awaited<ReturnType<typeof productosDomicilio>>,
+  nocheDesde: string,
+) {
+  // Noche: desde la hora configurada hasta las 6 de la mañana.
+  const h = fmtHora.format(pedido.creadoEn);
+  const deNoche = h >= nocheDesde || h < '06:00';
+  const porRestaurante = new Map<string, boolean>();
+  for (const l of pedido.lineas) {
+    const r = l.restaurante || 'Catering del spa';
+    porRestaurante.set(r, (porRestaurante.get(r) ?? false) || esCatering(l.restaurante, l.grupo));
+  }
+  return [...porRestaurante].flatMap(([restaurante, catering]) => {
+    const p = catering ? dom.catering : deNoche ? dom.noche : dom.dia;
+    return p ? [{ restaurante, productoId: p.id, nombre: p.nombre, precio: p.precio }] : [];
+  });
+}
+
 async function conSugerencias(tx: Tx | typeof prisma, pedidos: Prisma.PedidoMesaGetPayload<{ include: typeof conLineas }>[]) {
   const productos = await tx.producto.findMany({ where: { activo: true, seVende: true }, select: { id: true, nombre: true, precio: true } });
   const claves = [...new Set(pedidos.flatMap((p) => p.lineas.map((l) => claveDe(l.grupo, l.nombre))))];
   const alias = new Map((await tx.aliasCarta.findMany({ where: { clave: { in: claves } } })).map((a) => [a.clave, a.productoId]));
   const vigentes = new Set(productos.map((p) => p.id));
+  const dom = await productosDomicilio(tx);
+  const { domicilioNocheDesde } = await leerAjustes();
   return pedidos.map((p) => ({
     ...p,
+    domicilios: p.estado === 'PENDIENTE' ? domiciliosDe(p, dom, domicilioNocheDesde) : [],
     lineas: p.lineas.map((l) => {
       const aprendido = alias.get(claveDe(l.grupo, l.nombre));
       const productoId = l.productoId ?? (aprendido && vigentes.has(aprendido) ? aprendido : sugerir(l.grupo, l.nombre, l.precioCarta, productos));
@@ -134,6 +169,9 @@ export async function rutasPedidosMesa(app: FastifyInstance) {
       const l = objeto(crudo);
       elegidos.set(entero(l.id, 'Línea', 1, 999_999_999), entero(l.productoId, 'Producto', 1, 999_999_999));
     }
+    // Domicilios que recepción dejó marcados (cada uno es un producto "Domicilio …").
+    const domicilios = Array.isArray(b.domicilios) ? b.domicilios.map((d) => entero(d, 'Domicilio', 1, 999_999_999)) : [];
+    if (domicilios.length > 10) throw new ErrorHttp(400, 'Demasiados domicilios');
     const usuarioId = req.usuario!.id;
     return prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "PedidoMesa" WHERE id = ${id} FOR UPDATE`;
@@ -148,6 +186,13 @@ export async function rutasPedidosMesa(app: FastifyInstance) {
         await tx.pedidoMesaLinea.update({ where: { id: l.id }, data: { productoId } });
         const clave = claveDe(l.grupo, l.nombre);
         await tx.aliasCarta.upsert({ where: { clave }, create: { clave, productoId }, update: { productoId } });
+      }
+      if (domicilios.length) {
+        const validos = new Set((await productosDomicilio(tx)).todos.map((p) => p.id));
+        for (const d of domicilios) {
+          if (!validos.has(d)) throw new ErrorHttp(400, 'Ese producto no es un domicilio');
+          cantidades.set(d, (cantidades.get(d) ?? 0) + 1);
+        }
       }
       const cuenta = await cuentaAbiertaONueva(tx, cuentaDeMesa(pedido.mesa), usuarioId);
       await cargar(tx, cuenta, usuarioId, cantidades); // valida disponibilidad y manda comandas

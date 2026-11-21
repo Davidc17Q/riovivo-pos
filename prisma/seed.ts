@@ -35,7 +35,7 @@ async function main() {
           categoria: p.categoria,
           precio: p.precio,
           seVende: p.seVende ?? true,
-          estacion: estacionDe(p.categoria),
+          estacion: estacionDe(p.categoria, p.nombre),
           controlaStock: p.stock !== undefined,
           stock,
           movimientos: stock

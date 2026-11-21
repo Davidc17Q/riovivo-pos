@@ -3,7 +3,8 @@
 export type ItemCatalogo = { nombre: string; categoria: string; precio: number; stock?: number; seVende?: boolean };
 
 /** Estación de comandas por categoría: la comida va a cocina; bebidas y helados, al bar. */
-export function estacionDe(categoria: string): 'NINGUNA' | 'COCINA' | 'BAR' {
+export function estacionDe(categoria: string, nombre = ''): 'NINGUNA' | 'COCINA' | 'BAR' {
+  if (/^domicilio/i.test(nombre)) return 'NINGUNA'; // es un cobro, no un plato
   if (['Restaurante', 'Asados y picadas', 'Catering'].includes(categoria)) return 'COCINA';
   if (['Bebidas', 'Heladería'].includes(categoria)) return 'BAR';
   return 'NINGUNA';

@@ -19,7 +19,7 @@ async function main() {
       actualizados++;
     } else {
       await prisma.producto.create({
-        data: { nombre: p.nombre, categoria: p.categoria, precio: p.precio, seVende: p.seVende ?? true, estacion: estacionDe(p.categoria) },
+        data: { nombre: p.nombre, categoria: p.categoria, precio: p.precio, seVende: p.seVende ?? true, estacion: estacionDe(p.categoria, p.nombre) },
       });
       creados++;
     }

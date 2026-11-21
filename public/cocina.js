@@ -75,7 +75,11 @@ function pintar() {
       ? lista.map((c) => tarjeta(c, nuevas.includes(c))).join('')
       : `<p class="vacio">${{ PENDIENTE: 'Sin pedidos por ahora.', PREPARANDO: 'Nada en preparación.', LISTA: 'Nada esperando a ser entregado.' }[estado]}</p>`;
   }
-  if (nuevas.length) pitido();
+  if (nuevas.length) {
+    pitido();
+    const quien = (c) => c.referencia || (c.ventaId ? `venta ${c.ventaId}` : '');
+    if (sonido) setTimeout(() => decir(nuevas.length === 1 ? `Nueva comanda, ${quien(nuevas[0])}` : `${nuevas.length} comandas nuevas`), 500);
+  }
   vistas = new Set(comandas.map((c) => c.id));
 }
 

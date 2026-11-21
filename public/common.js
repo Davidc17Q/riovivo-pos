@@ -31,6 +31,38 @@ function tocar(notas, volumen = 0.3) {
   } catch { /* navegador sin audio: la venta sigue igual */ }
 }
 
+// Voz en español latino (la del sistema o del navegador). Se elige la más natural disponible.
+let vozLatina = null;
+function elegirVoz() {
+  if (!('speechSynthesis' in window)) return;
+  const voces = speechSynthesis.getVoices().filter((v) => /^es/i.test(v.lang));
+  const rango = (v) => {
+    const lang = v.lang.replace('_', '-').toLowerCase();
+    const region = ['es-co', 'es-mx', 'es-us', 'es-419'].indexOf(lang);
+    // Se prefieren voces latinas, femeninas y "naturales" (más suaves que las robóticas).
+    const suave = /sabina|paulina|dalia|salome|salomé|elena|camila|google|natural|online/i.test(v.name) ? 0.6 : 0;
+    return (region === -1 ? (lang === 'es-es' ? 9 : 5) : region) - suave;
+  };
+  vozLatina = voces.sort((a, b) => rango(a) - rango(b))[0] ?? null;
+}
+if ('speechSynthesis' in window) {
+  elegirVoz();
+  speechSynthesis.addEventListener?.('voiceschanged', elegirVoz);
+}
+/** Dice el texto con voz suave (un poco más lenta que lo normal). */
+function decir(texto) {
+  try {
+    if (!('speechSynthesis' in window)) return;
+    const u = new SpeechSynthesisUtterance(texto);
+    if (vozLatina) { u.voice = vozLatina; u.lang = vozLatina.lang; } else u.lang = 'es-MX';
+    u.rate = 0.92;
+    u.pitch = 1.05;
+    u.volume = 0.9;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+  } catch { /* sin voz: queda el timbre */ }
+}
+
 function hoyIso() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: ZONA }).format(new Date());
 }

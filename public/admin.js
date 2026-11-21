@@ -291,6 +291,7 @@ async function cargarAjustes() {
   const a = await api('GET', '/api/ajustes');
   $('#a-resena-url').value = a.resenaUrl ?? '';
   $('#a-resena-texto').value = a.resenaTexto;
+  $('#a-noche').value = a.domicilioNocheDesde;
   $('#error-ajustes').hidden = true;
   pintarPrevia();
 }
@@ -299,7 +300,7 @@ $('#a-resena-texto').oninput = pintarPrevia;
 $('#form-ajustes').onsubmit = async (e) => {
   e.preventDefault();
   try {
-    await api('PUT', '/api/ajustes', { resenaUrl: $('#a-resena-url').value.trim(), resenaTexto: $('#a-resena-texto').value.trim() });
+    await api('PUT', '/api/ajustes', { resenaUrl: $('#a-resena-url').value.trim(), resenaTexto: $('#a-resena-texto').value.trim(), domicilioNocheDesde: $('#a-noche').value });
     $('#error-ajustes').hidden = true;
     aviso('Ajustes guardados');
     await cargarAjustes();

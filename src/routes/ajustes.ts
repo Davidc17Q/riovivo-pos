@@ -4,12 +4,14 @@ import { prisma } from '../db';
 import { ErrorHttp, objeto, texto } from '../util';
 
 const TEXTO_RESENA = '¿Cómo te fue? Escanea y califica tu experiencia';
+const NOCHE_DESDE = '18:00';
 
-async function leer() {
-  const filas = await prisma.ajuste.findMany({ where: { clave: { in: ['resenaUrl', 'resenaTexto'] } } });
+export async function leerAjustes() {
+  const filas = await prisma.ajuste.findMany({ where: { clave: { in: ['resenaUrl', 'resenaTexto', 'domicilioNocheDesde'] } } });
   const v = Object.fromEntries(filas.map((f) => [f.clave, f.valor]));
-  return { resenaUrl: v.resenaUrl ?? null, resenaTexto: v.resenaTexto ?? TEXTO_RESENA };
+  return { resenaUrl: v.resenaUrl ?? null, resenaTexto: v.resenaTexto ?? TEXTO_RESENA, domicilioNocheDesde: v.domicilioNocheDesde ?? NOCHE_DESDE };
 }
+const leer = leerAjustes;
 
 /** Enlace http(s) que quepa en un QR (versión 10, nivel M: 213 bytes). */
 function enlace(v: unknown): string | null {
@@ -34,11 +36,14 @@ export async function rutasAjustes(app: FastifyInstance) {
     const b = objeto(req.body);
     const resenaUrl = enlace(b.resenaUrl);
     const resenaTexto = b.resenaTexto === undefined || b.resenaTexto === '' ? TEXTO_RESENA : texto(b.resenaTexto, 'Texto del ticket', 1, 80);
+    const noche = b.domicilioNocheDesde === undefined || b.domicilioNocheDesde === '' ? NOCHE_DESDE : String(b.domicilioNocheDesde);
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(noche)) throw new ErrorHttp(400, 'La hora del domicilio de noche debe ser HH:MM (por ejemplo 18:00)');
     await prisma.$transaction([
       resenaUrl === null
         ? prisma.ajuste.deleteMany({ where: { clave: 'resenaUrl' } })
         : prisma.ajuste.upsert({ where: { clave: 'resenaUrl' }, create: { clave: 'resenaUrl', valor: resenaUrl }, update: { valor: resenaUrl } }),
       prisma.ajuste.upsert({ where: { clave: 'resenaTexto' }, create: { clave: 'resenaTexto', valor: resenaTexto }, update: { valor: resenaTexto } }),
+      prisma.ajuste.upsert({ where: { clave: 'domicilioNocheDesde' }, create: { clave: 'domicilioNocheDesde', valor: noche }, update: { valor: noche } }),
     ]);
     return leer();
   });
