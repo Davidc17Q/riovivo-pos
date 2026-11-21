@@ -773,7 +773,9 @@ async function vigilarPedidos() {
         const nombres = nuevos.map((p) => (/^\d+$/.test(p.mesa) ? `Mesa ${p.mesa}` : p.mesa));
         if (sonidoVenta) {
           tocar(TIMBRE, 0.25);
-          setTimeout(() => decir(nuevos.length === 1 ? `Nuevo pedido, ${nombres[0]}` : `${nuevos.length} pedidos nuevos`), 750);
+          setTimeout(() => (nuevos.length === 1
+            ? anunciar([`pedido-${claveVoz(nombres[0])}`, 'nuevo-pedido'], `Nuevo pedido, ${nombres[0]}`)
+            : anunciar(['pedidos-nuevos'], `${nuevos.length} pedidos nuevos`)), 750);
         }
         aviso(`Nuevo pedido: ${nombres.join(', ')}`);
       }

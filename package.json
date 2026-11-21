@@ -14,7 +14,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "db:catalogo": "tsx prisma/cargar-catalogo.ts",
-    "test:e2e": "node test/e2e.mjs"
+    "test:e2e": "node test/e2e.mjs",
+    "voces": "node scripts/generar-voces.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -78,7 +78,9 @@ function pintar() {
   if (nuevas.length) {
     pitido();
     const quien = (c) => c.referencia || (c.ventaId ? `venta ${c.ventaId}` : '');
-    if (sonido) setTimeout(() => decir(nuevas.length === 1 ? `Nueva comanda, ${quien(nuevas[0])}` : `${nuevas.length} comandas nuevas`), 500);
+    if (sonido) setTimeout(() => (nuevas.length === 1
+      ? anunciar([`comanda-${claveVoz(quien(nuevas[0]))}`, 'nueva-comanda'], `Nueva comanda, ${quien(nuevas[0])}`)
+      : anunciar(['comandas-nuevas'], `${nuevas.length} comandas nuevas`)), 500);
   }
   vistas = new Set(comandas.map((c) => c.id));
 }

@@ -63,6 +63,28 @@ function decir(texto) {
   } catch { /* sin voz: queda el timbre */ }
 }
 
+// Avisos con voz grabada (ElevenLabs, generada con `npm run voces`). Si no hay audio para
+// ese aviso, se usa la voz del sistema con el mismo texto.
+let vocesGrabadas = new Set();
+fetch('/static/voz/manifiesto.json')
+  .then((r) => (r.ok ? r.json() : null))
+  .then((m) => { vocesGrabadas = new Set(m?.claves ?? []); })
+  .catch(() => {});
+/** "Mesa 3" → "mesa-3" (igual que en scripts/generar-voces.mjs). */
+const claveVoz = (s) => String(s).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+/** Reproduce el primer audio grabado de la lista; si no hay ninguno, lo dice la voz del sistema. */
+function anunciar(claves, texto) {
+  const clave = claves.find((c) => vocesGrabadas.has(c));
+  if (!clave) return decir(texto);
+  try {
+    const audio = new Audio(`/static/voz/${clave}.mp3`);
+    audio.volume = 0.95;
+    audio.play().catch(() => decir(texto));
+  } catch {
+    decir(texto);
+  }
+}
+
 function hoyIso() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: ZONA }).format(new Date());
 }
