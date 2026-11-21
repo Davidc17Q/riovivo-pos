@@ -402,6 +402,21 @@ tr.anulada .pago-pill { text-decoration: none; }
 .sonido-venta[aria-pressed=true] { color: var(--verde); }
 .sonido-venta[aria-pressed=true] .mudo, .sonido-venta[aria-pressed=false] .ondas { display: none; }
 
+/* ---------- Pedidos de las mesas ---------- */
+.pedidos { display: grid; gap: 14px; max-width: 900px; }
+.pedidos .vacio { padding: 30px 10px; border: 2px dashed var(--borde); border-radius: 14px; }
+.pedido { display: grid; gap: 10px; padding: 16px 18px; border-radius: 16px; background: #fff; box-shadow: var(--sombra); border-left: 5px solid var(--c5); }
+.pedido header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.pedido header b { font-family: var(--marca); font-size: 1.3rem; color: var(--tinta); }
+.nota-pedido { margin: 0; padding: 8px 12px; border-radius: 10px; background: #faf6f1; font-style: italic; }
+.linea-pedido { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 320px); gap: 6px 14px; align-items: center; padding: 8px 0; border-top: 1px dashed var(--borde); }
+.linea-pedido select { margin: 0; min-height: 42px; }
+.pedido footer { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 6px; border-top: 1px solid var(--borde); }
+.pedido footer .acciones { display: flex; gap: 8px; }
+.pedido footer .primario { min-height: 46px; }
+.atendidos-titulo { margin: 26px 0 8px; font-size: 1rem; }
+@media (max-width: 900px) { .linea-pedido { grid-template-columns: 1fr; } }
+
 /* Login */
 .login .panel { padding: 28px; border-radius: 20px; }
 .login .logo { display: block; width: 150px; margin: 0 auto 4px; }

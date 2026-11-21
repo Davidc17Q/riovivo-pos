@@ -700,6 +700,112 @@ $('#form-anular').onsubmit = async (e) => {
 $('#imprimir').onclick = () => window.print();
 $('#cerrar-ticket').onclick = () => $('#dlg-ticket').close();
 
+// ---------- Pedidos de las mesas (carta → POS) ----------
+let pedidos = [];
+let pendientesVistos = null;
+const eleccion = new Map(); // líneaId → productoId elegido por recepción (sobrevive a las actualizaciones)
+const TIMBRE = [[784, 0, 0.14], [988, 0.13, 0.14], [784, 0.3, 0.14], [988, 0.43, 0.22]];
+
+function opcionesProductos(elegido) {
+  const porCat = new Map();
+  for (const p of productos) porCat.set(p.categoria, [...(porCat.get(p.categoria) ?? []), p]);
+  return `<option value="">Elige el producto…</option>` + [...porCat].map(([cat, lista]) =>
+    `<optgroup label="${esc(cat)}">${lista.map((p) => `<option value="${p.id}" ${p.id === elegido ? 'selected' : ''}>${esc(p.nombre)} · ${cop(p.precio)}</option>`).join('')}</optgroup>`).join('');
+}
+
+function pintarPedidos() {
+  const pendientes = pedidos.filter((p) => p.estado === 'PENDIENTE');
+  const atendidos = pedidos.filter((p) => p.estado !== 'PENDIENTE').reverse();
+  $('#n-pedidos').hidden = pendientes.length === 0;
+  $('#n-pedidos').textContent = pendientes.length;
+  if ($('#vista-pedidos').hidden) return;
+  $('#lista-pedidos').innerHTML = pendientes.length
+    ? pendientes.map((p) => {
+        let total = 0;
+        const lineas = p.lineas.map((l) => {
+          const elegido = eleccion.get(l.id) ?? l.productoId;
+          const prod = porId(elegido);
+          if (prod) total += prod.precio * l.cantidad;
+          const marca = eleccion.has(l.id) ? '' : l.origen === 'aprendido' ? '<span class="pago-pill p-efectivo">Conocido</span>' : l.origen === 'sugerido' ? '<span class="pago-pill p-mixto">Revisa</span>' : '';
+          return `<div class="linea-pedido">
+            <div><b>${l.cantidad} ×</b> ${esc(l.nombre)} <span class="tenue chico">· ${esc(l.grupo)}${l.restaurante ? ` · ${esc(l.restaurante)}` : ''} · ${cop(l.precioCarta)} en la carta</span> ${marca}</div>
+            <select data-linea="${l.id}" aria-label="Producto del POS para ${esc(l.nombre)}">${opcionesProductos(elegido)}</select>
+          </div>`;
+        }).join('');
+        const completo = p.lineas.every((l) => porId(eleccion.get(l.id) ?? l.productoId));
+        const nombreCuenta = /^\d+$/.test(p.mesa) ? `Mesa ${p.mesa}` : p.mesa;
+        return `<article class="pedido" data-pedido="${p.id}">
+          <header><b>${esc(nombreCuenta)}</b><span class="tenue">${hora(p.creadoEn)} · hace ${Math.max(0, Math.floor((Date.now() - new Date(p.creadoEn)) / 60000))} min</span></header>
+          ${p.nota ? `<p class="nota-pedido">“${esc(p.nota)}”</p>` : ''}
+          ${lineas}
+          <footer>
+            <span>Total con precios del POS: <b>${cop(total)}</b></span>
+            <span class="acciones">
+              <button type="button" class="btn" data-rechazar="${p.id}">Rechazar</button>
+              <button type="button" class="btn primario" data-aceptar="${p.id}" ${completo ? '' : 'disabled'}>Aceptar y cargar a ${esc(nombreCuenta)}</button>
+            </span>
+          </footer>
+        </article>`;
+      }).join('')
+    : '<p class="vacio">No hay pedidos por atender. Cuando una mesa pida desde la carta, aparecerá aquí con un timbre.</p>';
+  $('#titulo-atendidos').hidden = $('#panel-atendidos').hidden = atendidos.length === 0;
+  $('#tabla-atendidos').innerHTML = atendidos.map((p) => `<tr>
+    <td>${hora(p.creadoEn)}</td><td>${esc(p.mesa)}</td>
+    <td>${esc(p.lineas.map((l) => `${l.cantidad} × ${l.nombre}`).join(', '))}</td>
+    <td>${p.estado === 'ACEPTADO' ? '<span class="pago-pill p-efectivo">Cargado a la cuenta</span>' : '<span class="pago-pill p-anulada">Rechazado</span>'}</td></tr>`).join('');
+}
+
+async function vigilarPedidos() {
+  try {
+    pedidos = await api('GET', '/api/pedidos-mesa');
+    const pendientes = pedidos.filter((p) => p.estado === 'PENDIENTE');
+    if (pendientesVistos) {
+      const nuevos = pendientes.filter((p) => !pendientesVistos.has(p.id));
+      if (nuevos.length) {
+        if (sonidoVenta) tocar(TIMBRE, 0.25);
+        aviso(`Nuevo pedido: ${nuevos.map((p) => (/^\d+$/.test(p.mesa) ? `Mesa ${p.mesa}` : p.mesa)).join(', ')}`);
+      }
+    }
+    pendientesVistos = new Set(pendientes.map((p) => p.id));
+    // No se repinta mientras alguien elige un producto en una lista.
+    if (!document.activeElement?.matches('#lista-pedidos select')) pintarPedidos();
+  } catch { /* sin conexión: se reintenta */ }
+}
+
+$('#lista-pedidos').onchange = (e) => {
+  const s = e.target.closest('[data-linea]');
+  if (!s) return;
+  if (s.value) eleccion.set(Number(s.dataset.linea), Number(s.value));
+  else eleccion.delete(Number(s.dataset.linea));
+  pintarPedidos();
+};
+$('#lista-pedidos').onclick = async (e) => {
+  const aceptar = e.target.closest('[data-aceptar]');
+  const rechazar = e.target.closest('[data-rechazar]');
+  const id = Number((aceptar ?? rechazar)?.dataset.aceptar ?? (aceptar ?? rechazar)?.dataset.rechazar);
+  const p = pedidos.find((x) => x.id === id);
+  if (!p) return;
+  try {
+    if (rechazar) {
+      if (!(await confirmar(`¿Rechazar el pedido de ${p.mesa}? No se carga a ninguna cuenta.`, 'Rechazar'))) return;
+      await api('POST', `/api/pedidos-mesa/${id}/rechazar`);
+      aviso('Pedido rechazado');
+    } else {
+      aceptar.disabled = true;
+      const r = await api('POST', `/api/pedidos-mesa/${id}/aceptar`, {
+        lineas: p.lineas.map((l) => ({ id: l.id, productoId: eleccion.get(l.id) ?? l.productoId })),
+      });
+      for (const l of p.lineas) eleccion.delete(l.id);
+      if (sonidoVenta) tocar(CAMPANITA, 0.18);
+      aviso(`Cargado a ${r.cuenta}`);
+      cargarCuentas().catch(() => {});
+    }
+  } catch (err) {
+    aviso(err.message, true);
+  }
+  await vigilarPedidos();
+};
+
 // ---------- Avisos de cocina ----------
 // Cada pocos segundos se mira el tablero: cuando un pedido queda listo, la caja se entera.
 let listasVistas = null;
@@ -728,8 +834,10 @@ async function vigilarComandas() {
   pintarSonidoVenta();
   vigilarComandas();
   setInterval(vigilarComandas, 10000);
+  vigilarPedidos();
+  setInterval(vigilarPedidos, 8000);
   iniciarPestanas((vista) => {
-    const cargar = { nueva: () => Promise.all([cargarProductos(), cargarCaja()]), cuentas: cargarCuentas, hoy: cargarHoy, caja: cargarVistaCaja };
+    const cargar = { nueva: () => Promise.all([cargarProductos(), cargarCaja()]), pedidos: async () => { if (!productos.length) await cargarProductos(); pintarPedidos(); await vigilarPedidos(); }, cuentas: cargarCuentas, hoy: cargarHoy, caja: cargarVistaCaja };
     cargar[vista]().catch((err) => aviso(err.message, true));
   });
 })();

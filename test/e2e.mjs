@@ -246,6 +246,38 @@ ok((await cocina('GET', '/api/comandas?estacion=COCINA')).s === 200, 'cocina ve 
 ok((await cocina('GET', '/api/ventas')).s === 403 && (await cocina('GET', '/api/productos')).s === 403 && (await cocina('GET', '/api/caja/actual')).s === 403, 'cocina no ve ventas, productos ni caja → 403');
 ok((await cocina('GET', '/ventas')).loc === '/cocina' && (await cocina('GET', '/')).loc === '/cocina', 'cocina va directo a su tablero');
 ok((await cocina('GET', '/cocina')).s === 200 && (await caja('GET', '/cocina')).s === 200, 'el tablero lo abren cocina y caja');
+console.log('— Pedidos desde la mesa (carta → POS) —');
+const CARTA = 'https://riovivospa.netlify.app';
+const pre = await fetch(B + '/api/publico/pedidos', { method: 'OPTIONS', headers: { Origin: CARTA, 'Access-Control-Request-Method': 'POST' } });
+ok(pre.status === 204 && pre.headers.get('access-control-allow-origin') === CARTA, 'la carta publicada puede enviar pedidos (CORS)');
+const preOtro = await fetch(B + '/api/publico/pedidos', { method: 'OPTIONS', headers: { Origin: 'https://otro-sitio.com' } });
+ok(!preOtro.headers.get('access-control-allow-origin'), 'otro sitio no recibe permiso CORS');
+const mesaP = 'E2E Terraza ' + nu;
+const lineaCarta = { restaurante: 'Delicias Frías', grupo: 'Grupo E2E', nombre: 'Plato carta ' + nu, cantidad: 2, precio: 10000 };
+ok((await anon('POST', '/api/publico/pedidos', { items: [lineaCarta] })).s === 400, 'pedido sin mesa → 400');
+ok((await anon('POST', '/api/publico/pedidos', { mesa: mesaP, items: [] })).s === 400, 'pedido vacío → 400');
+const pm = await anon('POST', '/api/publico/pedidos', { mesa: mesaP, items: [lineaCarta, { ...lineaCarta, nombre: 'Bebida carta ' + nu, cantidad: 1 }] });
+ok(pm.s === 201 && pm.d.id, 'la carta envía un pedido sin iniciar sesión');
+ok((await anon('GET', '/api/pedidos-mesa')).s === 401 && (await cocina('GET', '/api/pedidos-mesa')).s === 403, 'la bandeja de pedidos exige sesión de caja');
+const pedidoDe = async (id) => (await caja('GET', '/api/pedidos-mesa')).d.find((p) => p.id === id);
+const pv = await pedidoDe(pm.d.id);
+ok(pv && pv.estado === 'PENDIENTE' && pv.lineas.length === 2, 'recepción ve el pedido pendiente');
+ok((await caja('POST', `/api/pedidos-mesa/${pm.d.id}/aceptar`, { lineas: [{ id: pv.lineas[0].id, productoId: plato.id }] })).s === 400, 'aceptar sin elegir todos los productos → 400');
+const acep = await caja('POST', `/api/pedidos-mesa/${pm.d.id}/aceptar`, { lineas: [{ id: pv.lineas[0].id, productoId: plato.id }, { id: pv.lineas[1].id, productoId: bebida.id }] });
+ok(acep.s === 200 && acep.d.cuenta === mesaP, 'aceptar carga el pedido a la cuenta de la mesa', JSON.stringify(acep.d));
+const ctaMesa = (await caja('GET', `/api/cuentas/${acep.d.cuentaId}`)).d;
+ok(ctaMesa.estado === 'ABIERTA' && ctaMesa.total === 3 * 10000 && ctaMesa.items.length === 2, 'la cuenta queda con los consumos del pedido');
+ok((await caja('GET', '/api/comandas?estacion=TODAS')).d.filter((c) => c.cuentaId === acep.d.cuentaId).length === 2, 'y sale la comanda a cocina y al bar');
+ok((await caja('POST', `/api/pedidos-mesa/${pm.d.id}/aceptar`, { lineas: [] })).s === 409, 'aceptar dos veces → 409');
+const pm2 = await anon('POST', '/api/publico/pedidos', { mesa: mesaP, items: [{ ...lineaCarta, cantidad: 1 }] });
+const pv2 = await pedidoDe(pm2.d.id);
+ok(pv2.lineas[0].productoId === plato.id && pv2.lineas[0].origen === 'aprendido', 'la segunda vez el producto ya se reconoce solo');
+await caja('POST', `/api/pedidos-mesa/${pm2.d.id}/aceptar`, { lineas: [{ id: pv2.lineas[0].id, productoId: plato.id }] });
+ok((await caja('GET', `/api/cuentas/${acep.d.cuentaId}`)).d.total === 4 * 10000, 'un segundo pedido de la misma mesa se suma a su cuenta');
+const pm3 = await anon('POST', '/api/publico/pedidos', { mesa: mesaP, items: [lineaCarta] });
+ok((await caja('POST', `/api/pedidos-mesa/${pm3.d.id}/rechazar`)).s === 200 && (await pedidoDe(pm3.d.id)).estado === 'RECHAZADO', 'recepción puede rechazar un pedido');
+await admin('POST', `/api/cuentas/${acep.d.cuentaId}/cancelar`);
+
 await admin('PUT', `/api/usuarios/${uCocina.id}`, { activo: false });
 for (const p of [plato, bebida, servicio]) await admin('PUT', `/api/productos/${p.id}`, { ...p, activo: false });
 

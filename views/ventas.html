@@ -16,6 +16,7 @@
     <span class="marca"><img src="/static/img/loto.svg" alt=""> RioVivo Spa <small>Ventas</small></span>
     <nav class="pestanas" role="tablist">
       <button role="tab" data-vista="nueva">Nueva venta</button>
+      <button role="tab" data-vista="pedidos">Pedidos <span class="contador" id="n-pedidos" hidden></span></button>
       <button role="tab" data-vista="cuentas">Cuentas <span class="contador" id="n-cuentas" hidden></span></button>
       <button role="tab" data-vista="hoy">Ventas del día</button>
       <button role="tab" data-vista="caja">Caja</button>
@@ -110,6 +111,21 @@
           <button type="button" class="texto-btn cancelar-cuenta" id="cancelar-cuenta" hidden>Cancelar esta cuenta</button>
         </div>
       </aside>
+    </section>
+
+    <section id="vista-pedidos" hidden>
+      <div class="cabecera">
+        <h2>Pedidos de las mesas</h2>
+      </div>
+      <p class="tenue" style="margin-top:0">Llegan desde la carta cuando el cliente toca la tarjeta de su mesa. Revisa cada producto y acéptalo: se carga a la cuenta de la mesa y sale la comanda. Nada se cobra hasta cobrar la cuenta.</p>
+      <div class="pedidos" id="lista-pedidos"></div>
+      <h3 class="atendidos-titulo" id="titulo-atendidos" hidden>Atendidos en las últimas horas</h3>
+      <div class="panel tabla-caja" id="panel-atendidos" hidden>
+        <table>
+          <thead><tr><th>Hora</th><th>Mesa</th><th>Pedido</th><th>Estado</th></tr></thead>
+          <tbody id="tabla-atendidos"></tbody>
+        </table>
+      </div>
     </section>
 
     <section id="vista-cuentas" hidden>

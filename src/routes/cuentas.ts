@@ -39,7 +39,7 @@ async function cuentaAbierta(tx: Tx, id: number) {
  * Suma productos a la cuenta. Valida que se vendan y que, si llevan inventario, alcance hoy.
  * Lo que va a cocina o bar sale de una vez como comanda con el nombre de la cuenta.
  */
-async function cargar(tx: Tx, cuenta: { id: number; nombre: string }, usuarioId: number, cantidades: Map<number, number>) {
+export async function cargar(tx: Tx, cuenta: { id: number; nombre: string }, usuarioId: number, cantidades: Map<number, number>) {
   const cuentaId = cuenta.id;
   const ids = [...cantidades.keys()];
   const productos = await tx.producto.findMany({ where: { id: { in: ids } } });
@@ -57,6 +57,13 @@ async function cargar(tx: Tx, cuenta: { id: number; nombre: string }, usuarioId:
     });
   }
   await crearComandas(tx, { usuarioId, referencia: cuenta.nombre, cuentaId, cantidades });
+}
+
+/** Cuenta abierta con ese nombre (sin importar mayúsculas), o una nueva. Bloquea por nombre. */
+export async function cuentaAbiertaONueva(tx: Tx, nombre: string, usuarioId: number) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(lower(${nombre})))`;
+  const existente = await tx.cuenta.findFirst({ where: { estado: 'ABIERTA', nombre: { equals: nombre, mode: 'insensitive' } } });
+  return existente ?? tx.cuenta.create({ data: { nombre, abiertaPorId: usuarioId } });
 }
 
 const nombreDe = (v: unknown) => texto(typeof v === 'string' ? v.trim() : v, 'Nombre de la cuenta', 1, 60);

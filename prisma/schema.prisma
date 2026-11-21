@@ -264,3 +264,45 @@ model ComandaItem {
   nombre    String
   cantidad  Int
 }
+
+enum EstadoPedidoMesa {
+  PENDIENTE
+  ACEPTADO
+  RECHAZADO
+}
+
+// Pedido que el cliente hace desde la carta de su mesa (tarjeta NFCloud → carta → POS).
+// Nada se cobra ni va a cocina hasta que recepción lo acepta: entonces se carga a la
+// cuenta de la mesa.
+model PedidoMesa {
+  id            Int               @id @default(autoincrement())
+  creadoEn      DateTime          @default(now()) @db.Timestamptz(3)
+  mesa          String
+  nota          String?
+  estado        EstadoPedidoMesa  @default(PENDIENTE)
+  atendidoEn    DateTime?         @db.Timestamptz(3)
+  atendidoPorId Int?
+  cuentaId      Int?
+  lineas        PedidoMesaLinea[]
+
+  @@index([estado])
+}
+
+// Línea tal como llegó de la carta; productoId se fija al aceptar.
+model PedidoMesaLinea {
+  id          Int        @id @default(autoincrement())
+  pedidoId    Int
+  pedido      PedidoMesa @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  restaurante String
+  grupo       String
+  nombre      String
+  cantidad    Int
+  precioCarta Int
+  productoId  Int?
+}
+
+// Equivalencia aprendida: "grupo | nombre" de la carta → producto del POS.
+model AliasCarta {
+  clave      String @id
+  productoId Int
+}

@@ -13,6 +13,7 @@ import { rutasCaja } from './routes/caja';
 import { rutasCuentas } from './routes/cuentas';
 import { rutasAjustes } from './routes/ajustes';
 import { rutasComandas } from './routes/comandas';
+import { rutasPedidosMesa } from './routes/pedidos-mesa';
 import { ErrorHttp } from './util';
 
 const RAIZ = path.join(__dirname, '..');
@@ -23,7 +24,8 @@ if (!secreto && process.env.NODE_ENV === 'production') {
   throw new Error('Falta SESSION_SECRET');
 }
 
-const app = Fastify({ logger: { level: 'warn' } });
+// trustProxy: detrás de Railway, la IP real del cliente viene en X-Forwarded-For (límite de pedidos por dispositivo).
+const app = Fastify({ logger: { level: 'warn' }, trustProxy: true });
 
 app.register(cookie, { secret: secreto ?? 'solo-para-desarrollo-local' });
 app.register(fastifyStatic, { root: path.join(RAIZ, 'public'), prefix: '/static/' });
@@ -32,7 +34,8 @@ app.decorateRequest('usuario', null);
 
 // Toda la API exige sesión, salvo el login.
 app.addHook('preHandler', async (req, reply) => {
-  if (!req.url.startsWith('/api/') || req.url.startsWith('/api/login')) return;
+  // Sin sesión: el login y lo público (la carta de las mesas envía pedidos).
+  if (!req.url.startsWith('/api/') || req.url.startsWith('/api/login') || req.url.startsWith('/api/publico/')) return;
   const u = await usuarioDeSesion(req);
   if (!u) return reply.code(401).send({ error: 'Sesión no iniciada' });
   // Cocina solo usa su tablero: nada de ventas, caja, cuentas ni dinero.
@@ -57,6 +60,7 @@ app.register(rutasCaja);
 app.register(rutasCuentas);
 app.register(rutasAjustes);
 app.register(rutasComandas);
+app.register(rutasPedidosMesa);
 app.register(rutasAdmin);
 
 // Páginas: el servidor decide qué área puede abrir cada rol.
