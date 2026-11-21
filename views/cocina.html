@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Comandas · Río Vivo POS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&family=Quicksand:wght@500;600;700&display=swap">
+  <link rel="icon" href="/static/img/loto.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/marca.css">
+</head>
+<body class="cocina">
+  <header class="barra">
+    <span class="marca"><img src="/static/img/loto.svg" alt=""> RioVivo Spa <small>Comandas</small></span>
+    <nav class="pestanas" id="estaciones" role="group" aria-label="Estación">
+      <button type="button" data-estacion="COCINA">Cocina</button>
+      <button type="button" data-estacion="BAR">Bar</button>
+      <button type="button" data-estacion="TODAS">Todo</button>
+    </nav>
+    <div class="der">
+      <button type="button" class="sonido" id="sonido" aria-pressed="false" title="Avisar con sonido cuando llega un pedido">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path class="ondas" d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/><path class="mudo" d="m22 9-6 6M16 9l6 6"/></svg>
+        <span id="texto-sonido">Activar sonido</span>
+      </button>
+      <a href="/ventas" id="ir-ventas" class="cambiar-area" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6"/><circle cx="10" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg><span>Ir a ventas</span></a>
+      <span class="usuario"><span class="avatar" id="yo-iniciales" aria-hidden="true"></span><span class="quien"><b id="yo"></b><small id="yo-rol"></small></span></span>
+      <button class="enlace salir" id="salir" title="Cerrar sesión"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg><span>Salir</span></button>
+    </div>
+  </header>
+
+  <main>
+    <p class="error sin-conexion" id="sin-conexion" role="alert" hidden>Sin conexión con el servidor. Reintentando…</p>
+    <div class="tablero">
+      <section class="columna" aria-labelledby="t-pendientes">
+        <h2 id="t-pendientes">Pendientes <span class="contador" id="n-PENDIENTE"></span></h2>
+        <div class="tarjetas" id="col-PENDIENTE"></div>
+      </section>
+      <section class="columna" aria-labelledby="t-preparando">
+        <h2 id="t-preparando">En preparación <span class="contador" id="n-PREPARANDO"></span></h2>
+        <div class="tarjetas" id="col-PREPARANDO"></div>
+      </section>
+      <section class="columna" aria-labelledby="t-listas">
+        <h2 id="t-listas">Listas para entregar <span class="contador" id="n-LISTA"></span></h2>
+        <div class="tarjetas" id="col-LISTA"></div>
+      </section>
+    </div>
+  </main>
+
+  <script src="/static/common.js"></script>
+  <script src="/static/cocina.js"></script>
+</body>
+</html>

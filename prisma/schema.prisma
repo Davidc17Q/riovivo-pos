@@ -10,6 +10,23 @@ datasource db {
 enum Rol {
   ADMIN
   VENDEDOR
+  // Pantalla de comandas de cocina y bar: no ve ventas, caja ni dinero.
+  COCINA
+}
+
+// A dónde va el pedido de un producto al venderlo o cargarlo a una cuenta.
+enum Estacion {
+  NINGUNA
+  COCINA
+  BAR
+}
+
+enum EstadoComanda {
+  PENDIENTE
+  PREPARANDO
+  LISTA
+  ENTREGADA
+  CANCELADA
 }
 
 enum MetodoPago {
@@ -58,6 +75,7 @@ model Usuario {
   cajasCerradas  SesionCaja[]           @relation("CajaCerradaPor")
   movimientos    MovimientoInventario[]
   cuentas        Cuenta[]
+  comandas       Comanda[]
 }
 
 // Turno de caja de un usuario. Al cerrar se guarda el cuadre tal como se contó;
@@ -96,6 +114,7 @@ model Producto {
   seVende       Boolean                @default(true)
   controlaStock Boolean                @default(false)
   stock         Int                    @default(0)
+  estacion      Estacion               @default(NINGUNA)
   creadoEn      DateTime               @default(now()) @db.Timestamptz(3)
   items         VentaItem[]
   movimientos   MovimientoInventario[]
@@ -129,6 +148,7 @@ model Venta {
   anuladaPor      Usuario?               @relation("VentaAnuladaPor", fields: [anuladaPorId], references: [id])
   motivoAnulacion String?
   cuenta          Cuenta?
+  comandas        Comanda[]
 
   @@index([creadaEn])
   @@index([cajaId])
@@ -193,6 +213,7 @@ model Cuenta {
   ventaId      Int?         @unique
   venta        Venta?       @relation(fields: [ventaId], references: [id])
   items        CuentaItem[]
+  comandas     Comanda[]
 
   @@index([estado])
 }
@@ -207,4 +228,39 @@ model CuentaItem {
   cantidad   Int
 
   @@unique([cuentaId, productoId])
+}
+
+// Ajustes del negocio editables por el administrador (clave → valor de texto).
+model Ajuste {
+  clave         String   @id
+  valor         String
+  actualizadoEn DateTime @updatedAt @db.Timestamptz(3)
+}
+
+// Pedido para cocina o bar: nace al vender o al cargar a una cuenta productos con estación.
+// Una venta con comida y bebida genera dos comandas, una por estación.
+model Comanda {
+  id            Int           @id @default(autoincrement())
+  creadaEn      DateTime      @default(now()) @db.Timestamptz(3)
+  actualizadaEn DateTime      @updatedAt @db.Timestamptz(3)
+  estacion      Estacion
+  estado        EstadoComanda @default(PENDIENTE)
+  referencia    String?
+  ventaId       Int?
+  venta         Venta?        @relation(fields: [ventaId], references: [id])
+  cuentaId      Int?
+  cuenta        Cuenta?       @relation(fields: [cuentaId], references: [id])
+  usuarioId     Int
+  usuario       Usuario       @relation(fields: [usuarioId], references: [id])
+  items         ComandaItem[]
+
+  @@index([estado, estacion])
+}
+
+model ComandaItem {
+  id        Int     @id @default(autoincrement())
+  comandaId Int
+  comanda   Comanda @relation(fields: [comandaId], references: [id], onDelete: Cascade)
+  nombre    String
+  cantidad  Int
 }

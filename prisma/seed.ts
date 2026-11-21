@@ -1,7 +1,7 @@
 // Datos iniciales: 2 usuarios de prueba y el catálogo real de Río Vivo. Se puede correr varias veces sin duplicar.
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import { CATALOGO, type ItemCatalogo } from './catalogo';
+import { CATALOGO, estacionDe, type ItemCatalogo } from './catalogo';
 
 const prisma = new PrismaClient();
 
@@ -35,6 +35,7 @@ async function main() {
           categoria: p.categoria,
           precio: p.precio,
           seVende: p.seVende ?? true,
+          estacion: estacionDe(p.categoria),
           controlaStock: p.stock !== undefined,
           stock,
           movimientos: stock

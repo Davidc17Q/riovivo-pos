@@ -1,6 +1,7 @@
 // Área de ventas: catálogo para caja, registrar venta, ticket y ventas del día.
 import type { FastifyInstance } from 'fastify';
 import type { Prisma } from '@prisma/client';
+import { crearComandas } from './comandas';
 import { prisma } from '../db';
 import { ErrorHttp, UN_DIA_MS, entero, fecha, hoy, idDeUrl, inicioDelDia, objeto, opcion, texto } from '../util';
 
@@ -136,7 +137,11 @@ export async function rutasVentas(app: FastifyInstance) {
     const cantidades = leerItems(b.items);
     const usuarioId = req.usuario!.id;
     // Venta, líneas y descuento de inventario: todo o nada.
-    const venta = await prisma.$transaction((tx) => crearVenta(tx, usuarioId, cantidades, pago, referencia));
+    const venta = await prisma.$transaction(async (tx) => {
+      const v = await crearVenta(tx, usuarioId, cantidades, pago, referencia);
+      await crearComandas(tx, { usuarioId, referencia, ventaId: v.id, cantidades });
+      return v;
+    });
     return reply.code(201).send(venta);
   });
 

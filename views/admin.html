@@ -20,6 +20,7 @@
       <button role="tab" data-vista="cajas">Cajas</button>
       <button role="tab" data-vista="usuarios">Usuarios</button>
       <button role="tab" data-vista="reportes">Reportes</button>
+      <button role="tab" data-vista="ajustes">Ajustes</button>
     </nav>
     <div class="der">
       <a href="/ventas" class="cambiar-area"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6"/><circle cx="10" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg><span>Ir a ventas</span></a>
@@ -88,6 +89,28 @@
           <thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
           <tbody id="tabla-usuarios"></tbody>
         </table>
+      </div>
+    </section>
+
+    <section id="vista-ajustes" hidden>
+      <h2>Ajustes</h2>
+      <div class="ajustes">
+        <form class="panel apilado" id="form-ajustes">
+          <h3>QR de reseñas en el ticket</h3>
+          <p class="tenue chico" style="margin:0">Pega el enlace del punto de NFCloud en modo encuesta (por ejemplo <code>https://nfcloudco.com/r/ABC123</code>). Cada ticket impreso llevará un QR hacia él: el cliente califica, y si le fue bien termina en las reseñas de Google. Déjalo vacío para no imprimir QR.</p>
+          <label>Enlace de reseñas
+            <input type="url" id="a-resena-url" maxlength="200" placeholder="https://nfcloudco.com/r/…" autocomplete="off">
+          </label>
+          <label>Texto bajo el QR
+            <input type="text" id="a-resena-texto" maxlength="80">
+          </label>
+          <p class="error" id="error-ajustes" role="alert" hidden></p>
+          <button class="btn primario">Guardar</button>
+        </form>
+        <div class="panel vista-previa">
+          <span class="tenue chico">Así se verá al final del ticket</span>
+          <div class="ticket" id="previa-resena"></div>
+        </div>
       </div>
     </section>
 
@@ -167,6 +190,13 @@
       <label>Categoría <input type="text" id="p-categoria" maxlength="40" list="lista-categorias" required></label>
       <datalist id="lista-categorias"></datalist>
       <label>Precio (pesos) <input type="number" id="p-precio" min="0" max="100000000" step="1" inputmode="numeric" required></label>
+      <label>Al venderlo, el pedido va a
+        <select id="p-estacion">
+          <option value="NINGUNA">Ninguna estación (servicios, hospedaje…)</option>
+          <option value="COCINA">Cocina</option>
+          <option value="BAR">Bar</option>
+        </select>
+      </label>
       <label class="check"><input type="checkbox" id="p-vende"> Se vende en caja (desmarca para insumos internos)</label>
       <label class="check"><input type="checkbox" id="p-stock"> Lleva inventario</label>
       <label class="check"><input type="checkbox" id="p-activo"> Activo</label>
@@ -230,6 +260,7 @@
         <select id="u-rol">
           <option value="VENDEDOR">Vendedor (solo ventas)</option>
           <option value="ADMIN">Administrador (ventas y administración)</option>
+          <option value="COCINA">Cocina y bar (solo la pantalla de comandas)</option>
         </select>
       </label>
       <p class="error" id="error-usuario" role="alert" hidden></p>
@@ -241,6 +272,7 @@
   </dialog>
 
   <script src="/static/common.js"></script>
+  <script src="/static/qr.js"></script>
   <script src="/static/admin.js"></script>
 </body>
 </html>

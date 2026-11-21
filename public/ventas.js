@@ -6,6 +6,7 @@ let metodo = 'EFECTIVO';
 let dividir = false; // pago repartido entre varios métodos
 let cuentaActiva = null; // cuenta abierta que se está atendiendo (null = venta rápida)
 let cuentas = [];
+let ajustes = null; // enlace de reseñas para el QR del ticket
 let yo = null;
 let caja = null; // caja abierta de este usuario (null = no puede vender)
 let ventaEnTicket = null;
@@ -453,7 +454,8 @@ function mostrarTicket(v) {
         ? v.pagos.map((p) => `<div><span>Pago ${METODOS[p.metodo].toLowerCase()}</span><span>${cop(p.monto)}</span></div>`).join('')
         : `<div><span>Pago</span><span>${METODOS[v.metodoPago]}</span></div>`}
       ${v.recibido !== null && v.recibido !== undefined ? `<div><span>Efectivo recibido</span><span>${cop(v.recibido)}</span></div><div><span>Cambio</span><span>${cop(v.cambio ?? 0)}</span></div>` : ''}
-    </div>`;
+    </div>
+    ${anulada ? '' : htmlResena(ajustes)}`;
   $('#dlg-ticket').showModal();
 }
 
@@ -680,12 +682,33 @@ $('#form-anular').onsubmit = async (e) => {
 $('#imprimir').onclick = () => window.print();
 $('#cerrar-ticket').onclick = () => $('#dlg-ticket').close();
 
+// ---------- Avisos de cocina ----------
+// Cada pocos segundos se mira el tablero: cuando un pedido queda listo, la caja se entera.
+let listasVistas = null;
+async function vigilarComandas() {
+  try {
+    const listas = (await api('GET', '/api/comandas?estacion=TODAS')).filter((c) => c.estado === 'LISTA');
+    $('#n-listas').hidden = listas.length === 0;
+    $('#n-listas').textContent = listas.length;
+    if (listasVistas) {
+      const nuevas = listas.filter((c) => !listasVistas.has(c.id));
+      if (nuevas.length) {
+        const nombres = nuevas.map((c) => `${c.referencia || `Venta N.º ${c.ventaId}`} (${c.estacion === 'BAR' ? 'bar' : 'cocina'})`);
+        aviso(`Listo para entregar: ${nombres.join(', ')}`);
+      }
+    }
+    listasVistas = new Set(listas.map((c) => c.id));
+  } catch { /* sin conexión: se reintenta en la próxima vuelta */ }
+}
+
 (async () => {
   yo = await iniciarSesionUi();
   // Cierre ciego: el vendedor no ve totales en dinero de la caja ni del día.
   document.body.classList.toggle('vendedor', yo.rol !== 'ADMIN');
-  await Promise.all([cargarCaja(), cargarCuentas()]);
+  await Promise.all([cargarCaja(), cargarCuentas(), api('GET', '/api/ajustes').then((a) => { ajustes = a; }).catch(() => {})]);
   $('#ir-admin').hidden = yo.rol !== 'ADMIN';
+  vigilarComandas();
+  setInterval(vigilarComandas, 10000);
   iniciarPestanas((vista) => {
     const cargar = { nueva: () => Promise.all([cargarProductos(), cargarCaja()]), cuentas: cargarCuentas, hoy: cargarHoy, caja: cargarVistaCaja };
     cargar[vista]().catch((err) => aviso(err.message, true));

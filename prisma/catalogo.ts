@@ -2,6 +2,13 @@
 // restaurantes aliados). Precios en pesos enteros. Lo usan el seed y `npm run db:catalogo`.
 export type ItemCatalogo = { nombre: string; categoria: string; precio: number; stock?: number; seVende?: boolean };
 
+/** Estación de comandas por categoría: la comida va a cocina; bebidas y helados, al bar. */
+export function estacionDe(categoria: string): 'NINGUNA' | 'COCINA' | 'BAR' {
+  if (['Restaurante', 'Asados y picadas', 'Catering'].includes(categoria)) return 'COCINA';
+  if (['Bebidas', 'Heladería'].includes(categoria)) return 'BAR';
+  return 'NINGUNA';
+}
+
 const grupo = (categoria: string, items: [string, number][]): ItemCatalogo[] =>
   items.map(([nombre, precio]) => ({ nombre, categoria, precio }));
 

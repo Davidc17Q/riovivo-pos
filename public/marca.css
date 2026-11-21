@@ -59,7 +59,7 @@ main { padding: 24px; }
 .kpi b { font-family: var(--marca); font-weight: 700; color: var(--tinta); }
 .btn.primario { background: var(--verde); border-color: var(--verde); }
 .btn.primario:hover:not(:disabled) { background: #0f6873; }
-input[type=text], input[type=password], input[type=number], input[type=date], input[type=search], select, textarea { border-color: var(--borde); }
+input[type=text], input[type=url], input[type=password], input[type=number], input[type=date], input[type=search], select, textarea { border-color: var(--borde); }
 input:focus-visible, select:focus-visible, textarea:focus-visible { border-color: var(--agua); outline: 3px solid rgba(60, 182, 195, .25); outline-offset: 0; }
 tr.clic:hover { background: #f3fafa; }
 input[type=search] { min-height: 48px; border-color: transparent; border-radius: 12px; box-shadow: var(--sombra); }
@@ -334,6 +334,65 @@ tr.anulada .pago-pill { text-decoration: none; }
   .usuario .quien, .barra .salir span, .barra a.cambiar-area span { display: none; }
   .barra a.cambiar-area { padding: 0 9px; }
 }
+
+/* QR de reseñas al pie del ticket. */
+.qr-resena { display: grid; justify-items: center; gap: 4px; margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--borde); text-align: center; }
+.qr-resena svg { width: 34mm; height: 34mm; }
+.qr-resena p { margin: 0; font-size: .82rem; font-weight: 600; color: var(--tinta); max-width: 52mm; }
+.ajustes { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
+.ajustes code { font-size: .82rem; background: #faf6f1; padding: 1px 5px; border-radius: 6px; }
+.vista-previa { display: grid; gap: 8px; }
+.vista-previa .ticket { padding: 4px 8px 8px; }
+@media (max-width: 900px) { .ajustes { grid-template-columns: 1fr; } }
+
+/* ---------- Pantalla de comandas (cocina y bar) ---------- */
+.cocina main { padding: 18px 24px; }
+#estaciones button[aria-pressed=true] { background: #fff; color: var(--verde); box-shadow: 0 1px 3px rgba(30, 27, 58, .12); }
+.barra .sonido {
+  display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 0 12px; border-radius: 10px;
+  border: 1px solid var(--borde); background: #fff; color: var(--tenue); font-weight: 600; font-size: .86rem; text-decoration: none;
+}
+.barra .sonido svg { width: 17px; height: 17px; }
+.barra .sonido .ondas { display: none; }
+.barra .sonido[aria-pressed=true] { color: var(--verde); border-color: var(--verde); background: var(--verde-claro); }
+.barra .sonido[aria-pressed=true] .ondas { display: inline; }
+.barra .sonido[aria-pressed=true] .mudo { display: none; }
+.sin-conexion { margin-bottom: 12px; }
+.tablero { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: start; }
+.columna h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 1.05rem; color: var(--tinta); }
+.columna .contador { margin-left: 0; background: var(--tinta); }
+.tarjetas { display: grid; gap: 12px; }
+.tarjetas .vacio { padding: 28px 10px; border: 2px dashed var(--borde); border-radius: 14px; }
+.comanda {
+  display: grid; gap: 8px; padding: 14px 16px; border-radius: 14px; background: #fff;
+  box-shadow: var(--sombra); border-left: 5px solid var(--agua);
+}
+.comanda header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.comanda header b { font-family: var(--marca); font-size: 1.2rem; color: var(--tinta); overflow-wrap: anywhere; }
+.comanda .tiempo { flex: none; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--tenue); }
+.comanda ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 1.05rem; }
+.comanda li b { display: inline-block; min-width: 28px; font-family: var(--marca); color: var(--verde); }
+.comanda footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.comanda .acciones { display: flex; gap: 6px; }
+.comanda .acciones .primario { min-height: 44px; padding: 0 18px; font-size: 1rem; }
+.comanda .acciones .mini { min-height: 44px; min-width: 44px; }
+.comanda .etiqueta { justify-self: start; }
+.comanda.demora { border-left-color: var(--c6); }
+.comanda.demora .tiempo { color: var(--c6); }
+.comanda.tarde { border-left-color: var(--rojo); background: #fffaf8; }
+.comanda.tarde .tiempo { color: var(--rojo); }
+.comanda.cancelada { border-left-color: var(--rojo); opacity: .8; }
+.comanda.cancelada ul { text-decoration: line-through; color: var(--tenue); }
+.aviso-cancelada { margin: 0; padding: 6px 10px; border-radius: 8px; background: var(--rojo-claro); color: var(--rojo); font-weight: 700; font-size: .85rem; }
+.comanda.nueva { animation: llega .5s cubic-bezier(.2, .9, .3, 1.2); }
+@keyframes llega { from { opacity: 0; transform: translateY(-8px) scale(.97); } }
+#col-LISTA .comanda { border-left-color: var(--exito); }
+@media (max-width: 900px) {
+  .cocina main { padding: 12px; }
+  .tablero { grid-template-columns: 1fr; }
+  .barra .sonido span { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .comanda.nueva { animation: none; } }
 
 /* Login */
 .login .panel { padding: 28px; border-radius: 20px; }

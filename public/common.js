@@ -116,6 +116,16 @@ function htmlCuadre(c) {
     ${c.nota ? `<p class="tenue chico">Nota: ${esc(c.nota)}</p>` : ''}`;
 }
 
+/** Pie del ticket con el QR de reseñas (vacío si no hay enlace configurado). */
+function htmlResena(ajustes) {
+  if (!ajustes?.resenaUrl) return '';
+  try {
+    return `<div class="qr-resena">${QR.svg(ajustes.resenaUrl, { titulo: 'QR para calificar la experiencia' })}<p>${esc(ajustes.resenaTexto)}</p></div>`;
+  } catch {
+    return '';
+  }
+}
+
 /** Filas de la tabla de cajas (ventas y administración). */
 function filasCajas(cajas, conCerrar = false) {
   if (!cajas.length) return '<tr><td colspan="7" class="vacio">Aún no hay cajas.</td></tr>';
@@ -162,7 +172,7 @@ async function iniciarSesionUi() {
   // Quién está conectado: iniciales, nombre y rol (el nombre puede coincidir con un área, p. ej. "Administración").
   const iniciales = yo.nombre.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
   $('#yo').textContent = yo.nombre;
-  $('#yo-rol').textContent = yo.rol === 'ADMIN' ? 'Administrador' : 'Vendedor';
+  $('#yo-rol').textContent = { ADMIN: 'Administrador', VENDEDOR: 'Vendedor', COCINA: 'Cocina y bar' }[yo.rol] ?? '';
   $('#yo-iniciales').textContent = iniciales || '?';
   $('.usuario').title = `${yo.nombre} · ${$('#yo-rol').textContent}`;
   $('#salir').onclick = async () => {

@@ -11,6 +11,8 @@ import { rutasVentas } from './routes/ventas';
 import { rutasAdmin } from './routes/admin';
 import { rutasCaja } from './routes/caja';
 import { rutasCuentas } from './routes/cuentas';
+import { rutasAjustes } from './routes/ajustes';
+import { rutasComandas } from './routes/comandas';
 import { ErrorHttp } from './util';
 
 const RAIZ = path.join(__dirname, '..');
@@ -33,6 +35,10 @@ app.addHook('preHandler', async (req, reply) => {
   if (!req.url.startsWith('/api/') || req.url.startsWith('/api/login')) return;
   const u = await usuarioDeSesion(req);
   if (!u) return reply.code(401).send({ error: 'Sesión no iniciada' });
+  // Cocina solo usa su tablero: nada de ventas, caja, cuentas ni dinero.
+  if (u.rol === 'COCINA' && !/^\/api\/(comandas|me|logout)(\/|\?|$)/.test(req.url)) {
+    return reply.code(403).send({ error: 'Tu usuario solo tiene acceso a la pantalla de comandas' });
+  }
   req.usuario = u;
 });
 
@@ -49,24 +55,35 @@ app.register(rutasAuth);
 app.register(rutasVentas);
 app.register(rutasCaja);
 app.register(rutasCuentas);
+app.register(rutasAjustes);
+app.register(rutasComandas);
 app.register(rutasAdmin);
 
 // Páginas: el servidor decide qué área puede abrir cada rol.
-function pagina(archivo: string, soloAdmin = false) {
+const inicioDe = (rol: string) => (rol === 'COCINA' ? '/cocina' : '/ventas');
+
+function pagina(archivo: string, soloAdmin = false, paraCocina = false) {
   return async (req: FastifyRequest, reply: FastifyReply) => {
     const u = await usuarioDeSesion(req);
     if (!u) return reply.redirect('/login');
+    if (u.rol === 'COCINA' && !paraCocina) return reply.redirect('/cocina');
     if (soloAdmin && u.rol !== 'ADMIN') return reply.redirect('/ventas');
     return reply.header('Cache-Control', 'no-store').sendFile(archivo, VISTAS);
   };
 }
 
-app.get('/', async (req, reply) => reply.redirect((await usuarioDeSesion(req)) ? '/ventas' : '/login'));
-app.get('/login', async (req, reply) =>
-  (await usuarioDeSesion(req)) ? reply.redirect('/ventas') : reply.sendFile('login.html', VISTAS),
-);
+app.get('/', async (req, reply) => {
+  const u = await usuarioDeSesion(req);
+  return reply.redirect(u ? inicioDe(u.rol) : '/login');
+});
+app.get('/login', async (req, reply) => {
+  const u = await usuarioDeSesion(req);
+  return u ? reply.redirect(inicioDe(u.rol)) : reply.sendFile('login.html', VISTAS);
+});
 app.get('/ventas', pagina('ventas.html'));
 app.get('/admin', pagina('admin.html', true));
+// Tablero de comandas: cocina, y también caja o administración (por ejemplo en un televisor).
+app.get('/cocina', pagina('cocina.html', false, true));
 
 app.listen({ port: Number(process.env.PORT) || 3100, host: '0.0.0.0' }).then(
   (url) => console.log(`POS Río Vivo en ${url}`),

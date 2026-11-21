@@ -5,6 +5,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../db';
 import { soloAdmin } from '../auth';
 import { conDetalle } from './ventas';
+import { cancelarComandas } from './comandas';
 import { csv } from '../csv';
 import {
   ErrorHttp, UN_DIA_MS, ZONA, booleano, entero, fecha, idDeUrl, inicioDelDia, objeto, opcion, texto,
@@ -12,7 +13,8 @@ import {
 
 const PRECIO_MAXIMO = 100_000_000;
 const STOCK_MAXIMO = 1_000_000;
-const ROLES = ['ADMIN', 'VENDEDOR'] as const;
+const ROLES = ['ADMIN', 'VENDEDOR', 'COCINA'] as const;
+const ESTACIONES = ['NINGUNA', 'COCINA', 'BAR'] as const;
 const TIPOS_MANUALES = ['ENTRADA', 'SALIDA', 'AJUSTE'] as const;
 
 const usuarioPublico = { id: true, usuario: true, nombre: true, rol: true, activo: true, creadoEn: true } as const;
@@ -26,6 +28,8 @@ function datosProducto(body: unknown) {
     activo: booleano(b.activo, 'Activo'),
     seVende: booleano(b.seVende, 'Se vende'),
     controlaStock: booleano(b.controlaStock, 'Controla stock'),
+    // Opcional para no romper clientes anteriores: sin dato, no va a cocina ni a bar.
+    estacion: b.estacion === undefined ? undefined : opcion(b.estacion, 'Estación', ESTACIONES),
   };
 }
 
@@ -169,6 +173,7 @@ export async function rutasAdmin(app: FastifyInstance) {
         where: { id },
         data: { estado: 'ANULADA', anuladaEn: new Date(), anuladaPorId: usuarioId, motivoAnulacion: motivo },
       });
+      await cancelarComandas(tx, { ventaId: id });
     });
     return prisma.venta.findUnique({ where: { id }, include: conDetalle });
   });

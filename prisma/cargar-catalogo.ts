@@ -2,7 +2,7 @@
 // de lo que ya existe (por nombre) y desactiva los productos de demostración.
 // No borra nada: las ventas viejas siguen apuntando a sus productos. Uso: npm run db:catalogo
 import { PrismaClient } from '@prisma/client';
-import { CATALOGO, DEMO } from './catalogo';
+import { CATALOGO, DEMO, estacionDe } from './catalogo';
 
 const prisma = new PrismaClient();
 
@@ -19,7 +19,7 @@ async function main() {
       actualizados++;
     } else {
       await prisma.producto.create({
-        data: { nombre: p.nombre, categoria: p.categoria, precio: p.precio, seVende: p.seVende ?? true },
+        data: { nombre: p.nombre, categoria: p.categoria, precio: p.precio, seVende: p.seVende ?? true, estacion: estacionDe(p.categoria) },
       });
       creados++;
     }

@@ -51,6 +51,23 @@ Para cabañas, mesas o clientes que consumen durante el día y pagan al final (V
   dividido y vuelto. Dos cobros simultáneos de la misma cuenta no pasan: solo uno.
 - Una cuenta vacía la cancela cualquiera; con consumos, solo un administrador.
 
+## Comandas de cocina y bar
+
+- Cada producto tiene una **estación** (Administración → Productos): Cocina, Bar o ninguna. La
+  comida de Restaurante, Asados y Catering va a cocina; Bebidas y Heladería, al bar.
+- Al vender, o al cargar a una cuenta, lo que tiene estación sale como **comanda** (una por
+  estación) con la mesa, cabaña o cliente. Subir la cantidad en una cuenta manda solo lo nuevo.
+- **Tablero** en `/cocina`: Pendientes → En preparación → Listas → Entregada, con el tiempo de
+  espera (se marca a los 10 y a los 20 minutos), filtro Cocina/Bar/Todo y aviso con sonido.
+  Se actualiza solo cada 4 segundos. La caja recibe un aviso cuando un pedido queda listo.
+- **Rol "Cocina y bar"**: solo ve el tablero (ni ventas, ni caja, ni dinero). Se crea en
+  Administración → Usuarios. Anular una venta o cancelar una cuenta cancela lo que no ha salido.
+
+## QR de reseñas en el ticket
+
+En Administración → Ajustes se pega el enlace del punto de NFCloud en modo encuesta. Cada
+ticket lleva un QR hacia él (generador propio en `public/qr.js`, sin librerías). Vacío = sin QR.
+
 ## Despliegue en Railway
 
 `railway.json` ya define el build (`prisma generate && tsc`), las migraciones antes de arrancar

@@ -194,6 +194,61 @@ const vacia = (await caja('POST', '/api/cuentas', { nombre: nc })).d;
 ok((await caja('POST', `/api/cuentas/${vacia.id}/cobrar`, { metodoPago: 'EFECTIVO' })).s === 400, 'cobrar una cuenta vacía → 400');
 ok((await caja('POST', `/api/cuentas/${vacia.id}/cancelar`)).s === 200 && (await caja('GET', `/api/cuentas/${vacia.id}`)).d.estado === 'CANCELADA', 'el vendedor cancela una cuenta vacía');
 
+console.log('— Ajustes: QR de reseñas —');
+const ajustesAntes = (await admin('GET', '/api/ajustes')).d;
+ok((await caja('PUT', '/api/ajustes', { resenaUrl: 'https://x.co' })).s === 403, 'vendedor no cambia ajustes → 403');
+ok((await admin('PUT', '/api/ajustes', { resenaUrl: 'javascript:alert(1)' })).s === 400, 'enlace que no es http(s) → 400');
+ok((await admin('PUT', '/api/ajustes', { resenaUrl: 'no es un enlace' })).s === 400, 'enlace inválido → 400');
+const aj = await admin('PUT', '/api/ajustes', { resenaUrl: 'https://nfcloudco.com/r/E2E123', resenaTexto: 'Califícanos' });
+ok(aj.s === 200 && aj.d.resenaUrl === 'https://nfcloudco.com/r/E2E123', 'admin guarda el enlace de reseñas');
+ok((await caja('GET', '/api/ajustes')).d.resenaTexto === 'Califícanos', 'el vendedor lee el ajuste para el ticket');
+ok((await admin('PUT', '/api/ajustes', { resenaUrl: '' })).d.resenaUrl === null, 'enlace vacío = sin QR');
+await admin('PUT', '/api/ajustes', { resenaUrl: ajustesAntes.resenaUrl ?? '', resenaTexto: ajustesAntes.resenaTexto });
+
+console.log('— Comandas de cocina y bar —');
+const nuevoProd = (nombre, estacion) => admin('POST', '/api/productos', { nombre: `${nombre} ${nu}`, categoria: 'E2E ' + nu, precio: 10000, activo: true, seVende: true, controlaStock: false, estacion });
+const plato = (await nuevoProd('E2E Plato', 'COCINA')).d, bebida = (await nuevoProd('E2E Bebida', 'BAR')).d, servicio = (await nuevoProd('E2E Servicio', 'NINGUNA')).d;
+ok(plato.estacion === 'COCINA' && bebida.estacion === 'BAR', 'productos con estación');
+ok((await nuevoProd('E2E Malo', 'SALON')).s === 400, 'estación inválida → 400');
+const mesa = 'E2E Mesa ' + nu;
+const vc = await otro('POST', '/api/ventas', { items: [{ productoId: plato.id, cantidad: 2 }, { productoId: bebida.id, cantidad: 1 }, { productoId: servicio.id, cantidad: 1 }], metodoPago: 'EFECTIVO', referencia: mesa });
+const deMesa = async (estacion) => (await otro('GET', `/api/comandas?estacion=${estacion}`)).d.filter((c) => c.referencia === mesa);
+const [kc] = await deMesa('COCINA'), [kb] = await deMesa('BAR');
+ok(vc.s === 201 && kc && kc.ventaId === vc.d.id && kc.items.length === 1 && kc.items[0].cantidad === 2, 'la venta manda el plato a cocina', JSON.stringify(kc?.items));
+ok(kb && kb.items.length === 1 && kb.items[0].nombre === bebida.nombre, 'y la bebida al bar, en otra comanda');
+ok((await deMesa('TODAS')).length === 2, 'un producto sin estación no genera comanda');
+ok((await otro('POST', `/api/comandas/${kc.id}/estado`, { estado: 'PREPARANDO' })).d.estado === 'PREPARANDO', 'cocina pasa la comanda a preparación');
+ok((await otro('POST', `/api/comandas/${kc.id}/estado`, { estado: 'CANCELADA' })).s === 400, 'cancelar a mano no está permitido → 400');
+await admin('POST', `/api/ventas/${vc.d.id}/anular`, { motivo: 'Prueba de comandas' });
+ok((await deMesa('TODAS')).every((c) => c.estado === 'CANCELADA'), 'anular la venta cancela sus comandas pendientes y en preparación');
+ok((await otro('POST', `/api/comandas/${kc.id}/estado`, { estado: 'LISTA' })).s === 409, 'una comanda cancelada no avanza → 409');
+
+const cc = (await otro('POST', '/api/cuentas', { nombre: mesa, items: [{ productoId: plato.id, cantidad: 1 }] })).d;
+const deCuenta = async () => (await otro('GET', '/api/comandas?estacion=COCINA')).d.filter((c) => c.cuentaId === cc.id);
+ok((await deCuenta()).length === 1, 'cargar a una cuenta manda la comanda con el nombre de la cuenta');
+await otro('PUT', `/api/cuentas/${cc.id}/items/${plato.id}`, { cantidad: 3 });
+const trasSubir = await deCuenta();
+ok(trasSubir.length === 2 && trasSubir[1].items[0].cantidad === 2, 'subir la cantidad manda solo lo nuevo');
+await otro('PUT', `/api/cuentas/${cc.id}/items/${plato.id}`, { cantidad: 1 });
+ok((await deCuenta()).length === 2, 'bajar la cantidad no manda comanda');
+const [k1] = await deCuenta();
+for (const e of ['PREPARANDO', 'LISTA', 'ENTREGADA']) await otro('POST', `/api/comandas/${k1.id}/estado`, { estado: e });
+ok(!(await deCuenta()).some((c) => c.id === k1.id), 'una comanda entregada sale del tablero');
+ok((await otro('POST', `/api/comandas/${k1.id}/estado`, { estado: 'LISTA' })).s === 409, 'una comanda entregada no cambia → 409');
+await admin('POST', `/api/cuentas/${cc.id}/cancelar`);
+ok((await deCuenta()).every((c) => c.estado === 'CANCELADA'), 'cancelar la cuenta cancela lo que no ha salido de cocina');
+
+const uc = 'e2ecocina' + Date.now();
+const uCocina = (await admin('POST', '/api/usuarios', { usuario: uc, nombre: 'Cocina E2E', clave: 'clave-e2e-123', rol: 'COCINA' })).d;
+const cocina = cliente();
+ok((await cocina('POST', '/api/login', { usuario: uc, clave: 'clave-e2e-123' })).s === 200, 'login de cocina');
+ok((await cocina('GET', '/api/comandas?estacion=COCINA')).s === 200, 'cocina ve las comandas');
+ok((await cocina('GET', '/api/ventas')).s === 403 && (await cocina('GET', '/api/productos')).s === 403 && (await cocina('GET', '/api/caja/actual')).s === 403, 'cocina no ve ventas, productos ni caja → 403');
+ok((await cocina('GET', '/ventas')).loc === '/cocina' && (await cocina('GET', '/')).loc === '/cocina', 'cocina va directo a su tablero');
+ok((await cocina('GET', '/cocina')).s === 200 && (await caja('GET', '/cocina')).s === 200, 'el tablero lo abren cocina y caja');
+await admin('PUT', `/api/usuarios/${uCocina.id}`, { activo: false });
+for (const p of [plato, bebida, servicio]) await admin('PUT', `/api/productos/${p.id}`, { ...p, activo: false });
+
 // Limpieza: cajas cerradas, producto y usuario de prueba inactivos.
 for (const c of [caja, otro]) { const a = await actual(c); if (a) await c('POST', `/api/caja/${a.id}/cerrar`, { efectivoContado: 0 }); }
 await admin('PUT', `/api/productos/${np.id}`, { nombre: np.nombre, categoria: np.categoria, precio: 20000, activo: false, seVende: true, controlaStock: true });

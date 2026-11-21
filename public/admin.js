@@ -6,7 +6,8 @@ let editandoId = null; // producto en edición (null = nuevo)
 let movimientoDe = null; // producto del movimiento de inventario
 
 const TIPOS = { ENTRADA: 'Entrada', SALIDA: 'Salida', AJUSTE: 'Ajuste', VENTA: 'Venta', ANULACION: 'Anulación' };
-const ROLES = { ADMIN: 'Administrador', VENDEDOR: 'Vendedor' };
+const ROLES = { ADMIN: 'Administrador', VENDEDOR: 'Vendedor', COCINA: 'Cocina y bar' };
+const ESTACIONES = { COCINA: 'Cocina', BAR: 'Bar' };
 
 /** Envía un formulario de diálogo: muestra el error dentro o cierra al terminar. */
 function alEnviar(dlg, accion) {
@@ -45,7 +46,7 @@ function pintarProductos() {
   const lista = productos.filter((p) => !q || `${p.nombre} ${p.categoria}`.toLowerCase().includes(q));
   $('#tabla-productos').innerHTML = lista.length
     ? lista.map((p) => `<tr>
-        <td><b>${esc(p.nombre)}</b>${p.seVende ? '' : ' <span class="etiqueta gris">Insumo</span>'}</td>
+        <td><b>${esc(p.nombre)}</b>${p.seVende ? '' : ' <span class="etiqueta gris">Insumo</span>'}${ESTACIONES[p.estacion] ? ` <span class="etiqueta">${ESTACIONES[p.estacion]}</span>` : ''}</td>
         <td>${esc(p.categoria)}</td>
         <td class="num">${cop(p.precio)}</td>
         <td>${p.controlaStock ? `${p.stock} und.` : '<span class="tenue">No lleva</span>'}</td>
@@ -66,6 +67,7 @@ function abrirProducto(p) {
   $('#p-precio').value = p?.precio ?? '';
   $('#p-vende').checked = p?.seVende ?? true;
   $('#p-stock').checked = p?.controlaStock ?? false;
+  $('#p-estacion').value = p?.estacion ?? 'NINGUNA';
   $('#p-activo').checked = p?.activo ?? true;
   abrir($('#dlg-producto'));
 }
@@ -94,6 +96,7 @@ alEnviar($('#dlg-producto'), async () => {
     precio,
     seVende: $('#p-vende').checked,
     controlaStock: $('#p-stock').checked,
+    estacion: $('#p-estacion').value,
     activo: $('#p-activo').checked,
   };
   if (editandoId) await api('PUT', `/api/productos/${editandoId}`, datos);
@@ -278,9 +281,37 @@ $('#form-reporte').onsubmit = (e) => {
   cargarReporte().catch((err) => aviso(err.message, true));
 };
 
+// ---------- Ajustes ----------
+function pintarPrevia() {
+  const url = $('#a-resena-url').value.trim();
+  const previa = htmlResena({ resenaUrl: url, resenaTexto: $('#a-resena-texto').value.trim() || '¿Cómo te fue? Escanea y califica tu experiencia' });
+  $('#previa-resena').innerHTML = previa || '<p class="vacio">Sin enlace: el ticket no lleva QR.</p>';
+}
+async function cargarAjustes() {
+  const a = await api('GET', '/api/ajustes');
+  $('#a-resena-url').value = a.resenaUrl ?? '';
+  $('#a-resena-texto').value = a.resenaTexto;
+  $('#error-ajustes').hidden = true;
+  pintarPrevia();
+}
+$('#a-resena-url').oninput = pintarPrevia;
+$('#a-resena-texto').oninput = pintarPrevia;
+$('#form-ajustes').onsubmit = async (e) => {
+  e.preventDefault();
+  try {
+    await api('PUT', '/api/ajustes', { resenaUrl: $('#a-resena-url').value.trim(), resenaTexto: $('#a-resena-texto').value.trim() });
+    $('#error-ajustes').hidden = true;
+    aviso('Ajustes guardados');
+    await cargarAjustes();
+  } catch (err) {
+    $('#error-ajustes').textContent = err.message;
+    $('#error-ajustes').hidden = false;
+  }
+};
+
 (async () => {
   yo = await iniciarSesionUi();
   rangoRapido('mes');
-  const cargar = { productos: cargarProductos, inventario: cargarInventario, cajas: cargarCajas, usuarios: cargarUsuarios, reportes: cargarReporte };
+  const cargar = { productos: cargarProductos, inventario: cargarInventario, cajas: cargarCajas, usuarios: cargarUsuarios, reportes: cargarReporte, ajustes: cargarAjustes };
   iniciarPestanas((vista) => cargar[vista]().catch((err) => aviso(err.message, true)));
 })();

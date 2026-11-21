@@ -5,6 +5,7 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '../db';
 import { ErrorHttp, entero, idDeUrl, objeto, texto } from '../util';
 import { crearVenta, leerItems, leerPago } from './ventas';
+import { cancelarComandas, crearComandas } from './comandas';
 
 type Tx = Prisma.TransactionClient;
 
@@ -34,8 +35,12 @@ async function cuentaAbierta(tx: Tx, id: number) {
   return c;
 }
 
-/** Suma productos a la cuenta. Valida que se vendan y que, si llevan inventario, alcance hoy. */
-async function cargar(tx: Tx, cuentaId: number, cantidades: Map<number, number>) {
+/**
+ * Suma productos a la cuenta. Valida que se vendan y que, si llevan inventario, alcance hoy.
+ * Lo que va a cocina o bar sale de una vez como comanda con el nombre de la cuenta.
+ */
+async function cargar(tx: Tx, cuenta: { id: number; nombre: string }, usuarioId: number, cantidades: Map<number, number>) {
+  const cuentaId = cuenta.id;
   const ids = [...cantidades.keys()];
   const productos = await tx.producto.findMany({ where: { id: { in: ids } } });
   const actuales = await tx.cuentaItem.findMany({ where: { cuentaId, productoId: { in: ids } } });
@@ -51,6 +56,7 @@ async function cargar(tx: Tx, cuentaId: number, cantidades: Map<number, number>)
       update: { cantidad: nueva },
     });
   }
+  await crearComandas(tx, { usuarioId, referencia: cuenta.nombre, cuentaId, cantidades });
 }
 
 const nombreDe = (v: unknown) => texto(typeof v === 'string' ? v.trim() : v, 'Nombre de la cuenta', 1, 60);
@@ -80,7 +86,7 @@ export async function rutasCuentas(app: FastifyInstance) {
       const repetida = await tx.cuenta.findFirst({ where: { estado: 'ABIERTA', nombre: { equals: nombre, mode: 'insensitive' } } });
       if (repetida) throw new ErrorHttp(409, `Ya hay una cuenta abierta llamada "${repetida.nombre}"`);
       const c = await tx.cuenta.create({ data: { nombre, abiertaPorId: usuarioId } });
-      if (cantidades) await cargar(tx, c.id, cantidades);
+      if (cantidades) await cargar(tx, c, usuarioId, cantidades);
       return tx.cuenta.findUniqueOrThrow({ where: { id: c.id }, include: conItems });
     });
     return reply.code(201).send(conTotal(cuenta));
@@ -90,9 +96,10 @@ export async function rutasCuentas(app: FastifyInstance) {
   app.post('/api/cuentas/:id/items', async (req) => {
     const id = idDeUrl(req.params);
     const cantidades = leerItems(objeto(req.body).items);
+    const usuarioId = req.usuario!.id;
     const cuenta = await prisma.$transaction(async (tx) => {
-      await cuentaAbierta(tx, id);
-      await cargar(tx, id, cantidades);
+      const c = await cuentaAbierta(tx, id);
+      await cargar(tx, c, usuarioId, cantidades);
       return tx.cuenta.findUniqueOrThrow({ where: { id }, include: conItems });
     });
     return conTotal(cuenta);
@@ -103,8 +110,10 @@ export async function rutasCuentas(app: FastifyInstance) {
     const id = idDeUrl(req.params);
     const productoId = entero(Number((req.params as { productoId?: string }).productoId), 'Producto', 1, 999_999_999);
     const cantidad = entero(objeto(req.body).cantidad, 'Cantidad', 0, 9999);
+    const usuarioId = req.usuario!.id;
     const cuenta = await prisma.$transaction(async (tx) => {
-      await cuentaAbierta(tx, id);
+      const c = await cuentaAbierta(tx, id);
+      const antes = (await tx.cuentaItem.findUnique({ where: { cuentaId_productoId: { cuentaId: id, productoId } } }))?.cantidad ?? 0;
       if (cantidad === 0) {
         await tx.cuentaItem.deleteMany({ where: { cuentaId: id, productoId } });
       } else {
@@ -113,6 +122,8 @@ export async function rutasCuentas(app: FastifyInstance) {
         if (p.controlaStock && cantidad > p.stock) throw new ErrorHttp(409, `Solo quedan ${p.stock} de "${p.nombre}"`);
         const r = await tx.cuentaItem.updateMany({ where: { cuentaId: id, productoId }, data: { cantidad } });
         if (r.count === 0) throw new ErrorHttp(404, 'Ese producto no está en la cuenta');
+        // Si se pidió más, solo lo nuevo va a cocina; bajar la cantidad no genera comanda.
+        if (cantidad > antes) await crearComandas(tx, { usuarioId, referencia: c.nombre, cuentaId: id, cantidades: new Map([[productoId, cantidad - antes]]) });
       }
       return tx.cuenta.findUniqueOrThrow({ where: { id }, include: conItems });
     });
@@ -144,6 +155,7 @@ export async function rutasCuentas(app: FastifyInstance) {
       const n = await tx.cuentaItem.count({ where: { cuentaId: id } });
       if (n > 0 && yo.rol !== 'ADMIN') throw new ErrorHttp(403, 'Solo un administrador puede cancelar una cuenta con consumos');
       await tx.cuenta.update({ where: { id }, data: { estado: 'CANCELADA', cerradaEn: new Date() } });
+      await cancelarComandas(tx, { cuentaId: id });
     });
     return { ok: true };
   });
