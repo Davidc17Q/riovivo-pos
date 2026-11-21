@@ -48,9 +48,7 @@ async function generar(texto) {
     body: JSON.stringify({
       text: texto,
       model_id: MODELO,
-      language_code: 'es',
-      // Estable y cálida: poca variación entre un audio y otro.
-      voice_settings: { stability: 0.6, similarity_boost: 0.8, style: 0.15, use_speaker_boost: true },
+      // Sin voice_settings: la voz suena tal como está configurada en ElevenLabs.
     }),
   });
   if (!r.ok) throw new Error(`ElevenLabs respondió ${r.status}: ${(await r.text()).slice(0, 300)}`);
