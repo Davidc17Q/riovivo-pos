@@ -16,25 +16,9 @@ let vistas = null; // ids ya mostrados: lo que no esté aquí es nuevo
 let ocupado = false;
 
 // ---------- Sonido ----------
-let audio = null;
 function pitido() {
-  if (!sonido) return;
-  try {
-    audio ??= new AudioContext();
-    if (audio.state === 'suspended') audio.resume();
-    // Dos tonos cortos y suaves: se oyen en una cocina sin asustar.
-    [[880, 0], [1175, 0.18]].forEach(([f, t]) => {
-      const o = audio.createOscillator(), g = audio.createGain();
-      o.frequency.value = f;
-      o.type = 'sine';
-      g.gain.setValueAtTime(0.0001, audio.currentTime + t);
-      g.gain.exponentialRampToValueAtTime(0.35, audio.currentTime + t + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + t + 0.16);
-      o.connect(g).connect(audio.destination);
-      o.start(audio.currentTime + t);
-      o.stop(audio.currentTime + t + 0.18);
-    });
-  } catch { /* navegador sin audio */ }
+  // Dos tonos cortos y suaves: se oyen en una cocina sin asustar.
+  if (sonido) tocar([[880, 0, 0.16], [1175, 0.18, 0.16]], 0.35);
 }
 function pintarSonido() {
   $('#sonido').setAttribute('aria-pressed', sonido);

@@ -9,6 +9,28 @@ function esc(v) {
   return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
 
+// Sonidos cortos generados en el navegador (sin archivos de audio).
+let audioCtx = null;
+/** Toca notas [frecuencia Hz, inicio s, duración s]. Necesita que la persona ya haya tocado la página. */
+function tocar(notas, volumen = 0.3) {
+  try {
+    audioCtx ??= new AudioContext();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const t0 = audioCtx.currentTime;
+    for (const [f, t, d] of notas) {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = 'sine';
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0 + t);
+      g.gain.exponentialRampToValueAtTime(volumen, t0 + t + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + t + d);
+      o.connect(g).connect(audioCtx.destination);
+      o.start(t0 + t);
+      o.stop(t0 + t + d + 0.02);
+    }
+  } catch { /* navegador sin audio: la venta sigue igual */ }
+}
+
 function hoyIso() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: ZONA }).format(new Date());
 }

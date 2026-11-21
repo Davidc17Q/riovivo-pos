@@ -48,8 +48,20 @@ const FIGURAS_PAGO = {
   TRANSFERENCIA: '<g class="figura celular"><rect x="16" y="11" width="17" height="29" rx="3.5"/><path class="fino" d="M22.5 35.5h4"/><path class="senal" d="M37 14.5a6 6 0 0 1 0 8M40.5 11.5a10.5 10.5 0 0 1 0 14"/></g>' + SELLO,
 };
 
+// Sonido al confirmar: cada caja decide (se recuerda en este navegador).
+let sonidoVenta = true;
+try { sonidoVenta = localStorage.getItem('ventas.sonido') !== 'no'; } catch { /* sin almacenamiento */ }
+// Tres notas ascendentes (do-mi-sol), cortas y suaves, como una campanita de caja.
+const CAMPANITA = [[1047, 0, 0.2], [1319, 0.09, 0.2], [1568, 0.18, 0.34]];
+function pintarSonidoVenta() {
+  $('#sonido-venta').setAttribute('aria-pressed', sonidoVenta);
+  $('#sonido-venta').title = sonidoVenta ? 'Sonido al confirmar: activado (toca para silenciar)' : 'Sonido al confirmar: silenciado (toca para activar)';
+  $('#texto-sonido-venta').textContent = sonidoVenta ? 'Sonido activado' : 'Sonido silenciado';
+}
+
 /** Confirma la venta con un chulito verde que se dibuja; se va solo o con un toque. */
 function celebrar(v) {
+  if (sonidoVenta) tocar(CAMPANITA, 0.22);
   return new Promise((listo) => {
     const capa = document.createElement('div');
     capa.className = 'celebra';
@@ -550,6 +562,12 @@ $('#lineas').onclick = (e) => {
 };
 $('#descuento').oninput = pintarCarrito;
 $('#tipo-descuento').onchange = pintarCarrito;
+$('#sonido-venta').onclick = () => {
+  sonidoVenta = !sonidoVenta;
+  try { localStorage.setItem('ventas.sonido', sonidoVenta ? 'si' : 'no'); } catch { /* sin almacenamiento */ }
+  pintarSonidoVenta();
+  if (sonidoVenta) tocar(CAMPANITA, 0.22); // muestra cómo suena
+};
 $('#a-cuenta').onclick = () => dialogoCuenta('cargar');
 $('#nueva-cuenta').onclick = () => dialogoCuenta('nueva');
 $('#salir-cuenta').onclick = salirDeCuenta;
@@ -707,6 +725,7 @@ async function vigilarComandas() {
   document.body.classList.toggle('vendedor', yo.rol !== 'ADMIN');
   await Promise.all([cargarCaja(), cargarCuentas(), api('GET', '/api/ajustes').then((a) => { ajustes = a; }).catch(() => {})]);
   $('#ir-admin').hidden = yo.rol !== 'ADMIN';
+  pintarSonidoVenta();
   vigilarComandas();
   setInterval(vigilarComandas, 10000);
   iniciarPestanas((vista) => {

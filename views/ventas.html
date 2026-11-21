@@ -48,7 +48,13 @@
         </div>
         <div class="cabecera" style="margin-bottom:4px">
           <h2 id="titulo-venta">Venta en curso</h2>
-          <button type="button" class="texto-btn" id="vaciar" hidden>Vaciar</button>
+          <span class="cabecera-acciones">
+            <button type="button" class="texto-btn" id="vaciar" hidden>Vaciar</button>
+            <button type="button" class="sonido-venta" id="sonido-venta" aria-pressed="true" title="Sonido al confirmar la venta">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path class="ondas" d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/><path class="mudo" d="m22 9-6 6M16 9l6 6"/></svg>
+              <span class="oculto" id="texto-sonido-venta">Sonido activado</span>
+            </button>
+          </span>
         </div>
         <!-- Cuerpo desplazable: el pie con el botón de cobrar queda siempre a la vista. -->
         <div class="cuerpo-venta">

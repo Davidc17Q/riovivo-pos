@@ -394,6 +394,14 @@ tr.anulada .pago-pill { text-decoration: none; }
 }
 @media (prefers-reduced-motion: reduce) { .comanda.nueva { animation: none; } }
 
+/* Sonido al confirmar la venta. */
+.cabecera-acciones { display: inline-flex; align-items: center; gap: 4px; }
+.sonido-venta { display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 10px; background: none; color: var(--tenue); }
+.sonido-venta:hover { background: var(--verde-claro); color: var(--verde); }
+.sonido-venta svg { width: 18px; height: 18px; }
+.sonido-venta[aria-pressed=true] { color: var(--verde); }
+.sonido-venta[aria-pressed=true] .mudo, .sonido-venta[aria-pressed=false] .ondas { display: none; }
+
 /* Login */
 .login .panel { padding: 28px; border-radius: 20px; }
 .login .logo { display: block; width: 150px; margin: 0 auto 4px; }
