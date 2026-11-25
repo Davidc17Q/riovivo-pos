@@ -4,6 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Estacion, EstadoComanda, Prisma } from '@prisma/client';
 import { prisma } from '../db';
 import { ErrorHttp, idDeUrl, objeto, opcion } from '../util';
+import { leerAjustes } from './ajustes';
 
 type Tx = Prisma.TransactionClient;
 
@@ -26,6 +27,8 @@ export async function crearComandas(
 ) {
   const ids = [...o.cantidades.keys()];
   if (!ids.length) return;
+  // Si el negocio no usa pantalla de cocina, no se generan comandas.
+  if (!(await leerAjustes()).comandas) return;
   const productos = await tx.producto.findMany({ where: { id: { in: ids }, estacion: { not: 'NINGUNA' } }, orderBy: { id: 'asc' } });
   const porEstacion = new Map<Estacion, { nombre: string; cantidad: number }[]>();
   for (const p of productos) {

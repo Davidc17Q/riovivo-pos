@@ -104,6 +104,14 @@
           <label>Texto bajo el QR
             <input type="text" id="a-resena-texto" maxlength="80">
           </label>
+          <h3 style="margin-top:10px">Métodos de pago</h3>
+          <div class="checks" id="a-metodos">
+            <label class="check"><input type="checkbox" value="EFECTIVO"> Efectivo</label>
+            <label class="check"><input type="checkbox" value="TRANSFERENCIA"> Transferencia</label>
+            <label class="check"><input type="checkbox" value="TARJETA"> Tarjeta (datáfono)</label>
+          </div>
+          <h3 style="margin-top:10px">Cocina propia</h3>
+          <label class="check"><input type="checkbox" id="a-comandas"> Usar pantalla de cocina y comandas (solo si el negocio prepara la comida en su propia cocina)</label>
           <h3 style="margin-top:10px">Domicilio de los pedidos de las mesas</h3>
           <p class="tenue chico" style="margin:0">Al aceptar un pedido se suma un domicilio por restaurante: catering, o tarifa de día o de noche (productos "Domicilio …" del catálogo). La noche va desde esta hora hasta las 6:00 a. m. Recepción puede desmarcarlo.</p>
           <label>Tarifa de noche desde
@@ -195,7 +203,7 @@
       <label>Categoría <input type="text" id="p-categoria" maxlength="40" list="lista-categorias" required></label>
       <datalist id="lista-categorias"></datalist>
       <label>Precio (pesos) <input type="number" id="p-precio" min="0" max="100000000" step="1" inputmode="numeric" required></label>
-      <label>Al venderlo, el pedido va a
+      <label id="lbl-estacion">Al venderlo, el pedido va a
         <select id="p-estacion">
           <option value="NINGUNA">Ninguna estación (servicios, hospedaje…)</option>
           <option value="COCINA">Cocina</option>

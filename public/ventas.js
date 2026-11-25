@@ -513,7 +513,7 @@ function pintarHoy() {
   // Filtros con su conteo; Mixto y Anuladas solo aparecen si hay alguna.
   $('#filtro-ventas').innerHTML = Object.entries(FILTROS)
     .map(([k, f]) => [k, f, ventasHoy.filter(f.cumple).length])
-    .filter(([k, , n]) => n > 0 || !['MIXTO', 'ANULADAS'].includes(k) || k === filtroVentas)
+    .filter(([k, , n]) => n > 0 || k === filtroVentas || (!['MIXTO', 'ANULADAS'].includes(k) && (k === 'TODAS' || habilitado(k))))
     .map(([k, f, n]) => `<button type="button" data-filtro="${k}" aria-pressed="${k === filtroVentas}">${f.nombre} <span class="n-filtro">${n}</span></button>`)
     .join('');
   const q = $('#buscar-ventas').value.trim().toLowerCase();
@@ -827,6 +827,23 @@ $('#lista-pedidos').onclick = async (e) => {
   await vigilarPedidos();
 };
 
+// ---------- Lo que el negocio tiene habilitado (Administración → Ajustes) ----------
+const habilitado = (m) => !ajustes?.metodosPago || ajustes.metodosPago.includes(m);
+function aplicarAjustes() {
+  const metodos = ['EFECTIVO', 'TARJETA', 'TRANSFERENCIA'].filter(habilitado);
+  for (const b of document.querySelectorAll('#metodos [data-metodo]')) b.hidden = !habilitado(b.dataset.metodo);
+  $('#metodos').style.gridTemplateColumns = `repeat(${metodos.length}, 1fr)`;
+  for (const el of document.querySelectorAll('[data-parte]')) el.closest('label').hidden = !habilitado(el.dataset.parte);
+  // Con un solo método no hay nada que dividir.
+  $('#dividir').hidden = metodos.length < 2;
+  if (!habilitado(metodo)) metodo = metodos[0];
+  for (const [m, ids] of [['EFECTIVO', ['#hoy-EFECTIVO']], ['TARJETA', ['#hoy-TARJETA', '#caja-tarjeta']], ['TRANSFERENCIA', ['#hoy-TRANSFERENCIA', '#caja-transferencia']]]) {
+    for (const id of ids) $(id).closest('.kpi').hidden = !habilitado(m);
+  }
+  $('a.cambiar-area[href="/cocina"]').hidden = ajustes?.comandas === false;
+  pintarCarrito();
+}
+
 // ---------- Avisos de cocina ----------
 // Cada pocos segundos se mira el tablero: cuando un pedido queda listo, la caja se entera.
 let listasVistas = null;
@@ -853,8 +870,12 @@ async function vigilarComandas() {
   await Promise.all([cargarCaja(), cargarCuentas(), api('GET', '/api/ajustes').then((a) => { ajustes = a; }).catch(() => {})]);
   $('#ir-admin').hidden = yo.rol !== 'ADMIN';
   pintarSonidoVenta();
-  vigilarComandas();
-  setInterval(vigilarComandas, 10000);
+  aplicarAjustes();
+  // Pantalla de cocina: solo si el negocio la usa.
+  if (ajustes?.comandas !== false) {
+    vigilarComandas();
+    setInterval(vigilarComandas, 10000);
+  }
   vigilarPedidos();
   setInterval(vigilarPedidos, 8000);
   iniciarPestanas((vista) => {

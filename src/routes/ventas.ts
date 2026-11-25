@@ -2,6 +2,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { Prisma } from '@prisma/client';
 import { crearComandas } from './comandas';
+import { leerAjustes } from './ajustes';
 import { prisma } from '../db';
 import { ErrorHttp, UN_DIA_MS, entero, fecha, hoy, idDeUrl, inicioDelDia, objeto, opcion, texto } from '../util';
 
@@ -86,6 +87,12 @@ export async function crearVenta(tx: Tx, usuarioId: number, cantidades: Map<numb
   const pagado = pagos.reduce((s, p) => s + p.monto, 0);
   if (pagado !== total) {
     throw new ErrorHttp(400, pagado < total ? `Falta por pagar ${total - pagado} pesos` : 'Los pagos superan el total de la venta');
+  }
+  // Solo los métodos que el negocio tiene habilitados (Ajustes).
+  const { metodosPago } = await leerAjustes();
+  const metodoSuelto = pagos.length ? null : metodoSimple;
+  if ([...pagos.map((p) => p.metodo), ...(metodoSuelto ? [metodoSuelto] : [])].some((m) => !(metodosPago as string[]).includes(m))) {
+    throw new ErrorHttp(400, 'Ese método de pago no está habilitado en este negocio');
   }
   const metodoPago = pagos.length > 1 ? 'MIXTO' : (pagos[0]?.metodo ?? metodoSimple ?? 'EFECTIVO');
   // Vuelto: solo aplica a la parte en efectivo.

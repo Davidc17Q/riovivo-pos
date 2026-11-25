@@ -19,6 +19,10 @@ const anon = cliente(), admin = cliente(), caja = cliente(), otro = cliente();
 ok((await anon('GET', '/api/productos')).s === 401, 'API sin sesión → 401');
 ok((await admin('POST', '/api/login', { usuario: 'admin', clave: 'admin1234' })).s === 200, 'login admin');
 ok((await caja('POST', '/api/login', { usuario: 'caja', clave: 'caja1234' })).s === 200, 'login vendedor');
+// Las pruebas usan los tres métodos y la cocina: se habilitan aquí y al final se deja como estaba.
+const ajustesOriginales = (await admin('GET', '/api/ajustes')).d;
+const restaurarAjustes = () => admin('PUT', '/api/ajustes', { ...ajustesOriginales, resenaUrl: ajustesOriginales.resenaUrl ?? '' });
+await admin('PUT', '/api/ajustes', { ...ajustesOriginales, resenaUrl: ajustesOriginales.resenaUrl ?? '', metodosPago: ['EFECTIVO', 'TARJETA', 'TRANSFERENCIA'], comandas: true });
 ok((await caja('GET', '/admin')).loc === '/ventas', 'vendedor en /admin → vuelve a /ventas');
 const nu = 'e2e' + Date.now();
 const uOtro = (await admin('POST', '/api/usuarios', { usuario: nu, nombre: 'Vendedor E2E', clave: 'clave-e2e-123', rol: 'VENDEDOR' })).d;
@@ -288,6 +292,16 @@ await admin('POST', `/api/cuentas/${acep.d.cuentaId}/cancelar`);
 
 await admin('PUT', `/api/usuarios/${uCocina.id}`, { activo: false });
 for (const p of [plato, bebida, servicio]) await admin('PUT', `/api/productos/${p.id}`, { ...p, activo: false });
+
+console.log('— Ajustes del negocio: métodos de pago y cocina —');
+await admin('PUT', '/api/ajustes', { metodosPago: ['EFECTIVO', 'TRANSFERENCIA'], comandas: false });
+ok((await vender(otro, [{ productoId: masaje.id, cantidad: 1 }], 'TARJETA')).s === 400, 'tarjeta deshabilitada → 400');
+ok((await otro('POST', '/api/ventas', { items: [{ productoId: masaje.id, cantidad: 1 }], pagos: [{ metodo: 'TARJETA', monto: M }] })).s === 400, 'tarjeta deshabilitada en pago dividido → 400');
+ok((await admin('PUT', '/api/ajustes', { metodosPago: [] })).s === 400, 'no se pueden deshabilitar todos los métodos → 400');
+const sinCocina = await vender(otro, [{ productoId: masaje.id, cantidad: 1 }], 'TRANSFERENCIA');
+ok(sinCocina.s === 201 && !(await otro('GET', '/api/comandas?estacion=TODAS')).d.some((c) => c.ventaId === sinCocina.d.id), 'sin cocina propia no se generan comandas');
+await admin('POST', `/api/ventas/${sinCocina.d.id}/anular`, { motivo: 'Prueba de ajustes' });
+await restaurarAjustes();
 
 // Limpieza: cajas cerradas, producto y usuario de prueba inactivos.
 for (const c of [caja, otro]) { const a = await actual(c); if (a) await c('POST', `/api/caja/${a.id}/cerrar`, { efectivoContado: 0 }); }

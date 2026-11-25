@@ -183,7 +183,7 @@ function htmlCuadre(c) {
       <div class="total ${q.diferencia < 0 ? 'falta' : ''}"><span>Diferencia</span><span>${textoDiferencia(q.diferencia)}</span></div>` : ''}
     </div>
     <div class="totales">
-      <div><span>Ventas con tarjeta</span><span>${cop(q.tarjeta)}</span></div>
+      ${q.tarjeta ? `<div><span>Ventas con tarjeta</span><span>${cop(q.tarjeta)}</span></div>` : ''}
       <div><span>Ventas por transferencia</span><span>${cop(q.transferencia)}</span></div>
       <div><b>Total vendido · ${q.ventas} ${q.ventas === 1 ? 'venta' : 'ventas'}</b><b>${cop(q.totalVentas)}</b></div>
       ${q.anuladas ? `<div class="tenue chico"><span>Anuladas (no cuentan): ${q.anuladas}</span><span>${cop(q.totalAnulado)}</span></div>` : ''}

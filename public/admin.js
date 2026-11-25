@@ -282,6 +282,11 @@ $('#form-reporte').onsubmit = (e) => {
 };
 
 // ---------- Ajustes ----------
+/** Oculta lo que el negocio no usa: estación de cocina y rol de cocina si no hay comandas. */
+function aplicarAjustes(a) {
+  $('#lbl-estacion').hidden = !a.comandas;
+  $('#u-rol option[value=COCINA]').hidden = !a.comandas;
+}
 function pintarPrevia() {
   const url = $('#a-resena-url').value.trim();
   const previa = htmlResena({ resenaUrl: url, resenaTexto: $('#a-resena-texto').value.trim() || '¿Cómo te fue? Escanea y califica tu experiencia' });
@@ -292,6 +297,9 @@ async function cargarAjustes() {
   $('#a-resena-url').value = a.resenaUrl ?? '';
   $('#a-resena-texto').value = a.resenaTexto;
   $('#a-noche').value = a.domicilioNocheDesde;
+  for (const c of document.querySelectorAll('#a-metodos input')) c.checked = a.metodosPago.includes(c.value);
+  $('#a-comandas').checked = a.comandas;
+  aplicarAjustes(a);
   $('#error-ajustes').hidden = true;
   pintarPrevia();
 }
@@ -300,7 +308,9 @@ $('#a-resena-texto').oninput = pintarPrevia;
 $('#form-ajustes').onsubmit = async (e) => {
   e.preventDefault();
   try {
-    await api('PUT', '/api/ajustes', { resenaUrl: $('#a-resena-url').value.trim(), resenaTexto: $('#a-resena-texto').value.trim(), domicilioNocheDesde: $('#a-noche').value });
+    await api('PUT', '/api/ajustes', { resenaUrl: $('#a-resena-url').value.trim(), resenaTexto: $('#a-resena-texto').value.trim(), domicilioNocheDesde: $('#a-noche').value,
+      metodosPago: [...document.querySelectorAll('#a-metodos input:checked')].map((c) => c.value),
+      comandas: $('#a-comandas').checked });
     $('#error-ajustes').hidden = true;
     aviso('Ajustes guardados');
     await cargarAjustes();
@@ -313,6 +323,7 @@ $('#form-ajustes').onsubmit = async (e) => {
 (async () => {
   yo = await iniciarSesionUi();
   rangoRapido('mes');
+  api('GET', '/api/ajustes').then(aplicarAjustes).catch(() => {});
   const cargar = { productos: cargarProductos, inventario: cargarInventario, cajas: cargarCajas, usuarios: cargarUsuarios, reportes: cargarReporte, ajustes: cargarAjustes };
   iniciarPestanas((vista) => cargar[vista]().catch((err) => aviso(err.message, true)));
 })();
